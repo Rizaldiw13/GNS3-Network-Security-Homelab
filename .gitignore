@@ -1,0 +1,37 @@
+# Virtual machine disks
+*.vhd
+*.vhdx
+*.vmdk
+*.qcow
+*.qcow2
+
+# Installation images
+*.iso
+*.img
+
+# Appliance / firmware images
+*.bin
+*.image
+
+# Credentials and secrets
+*.pem
+*.key
+*.pfx
+*.p12
+.env
+secrets.*
+credentials.*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Ansible temporary files
+*.retry
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
