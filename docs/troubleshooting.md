@@ -1,4 +1,4 @@
-# Troubleshooting Guide
+# Troubleshooting 
 
 **Last updated:** 2026-08-28
 
