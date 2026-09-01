@@ -775,6 +775,273 @@ The final topology does not depend on the direct R1-R3 link for service availabi
 
 ---
 
+## 11. Switch1-to-Switch3 Same-VLAN Traffic Failed
+
+### Problem
+PC1/PC7, PC2/PC8, and PC3/PC9 could not communicate even though each pair was configured for the same VLAN and subnet.
+
+### Symptoms
+- PC3 could ping its R1 gateway `10.10.50.1`.
+- PC3 could not ping PC9 `10.10.50.20`.
+- Similar failures occurred for VLAN 10 and VLAN 40 pairs.
+
+### Root Cause
+Only one side of the Switch1-Switch3 link had been configured as `dot1q`.
+
+Switch3 `eth4` was a trunk, but Switch1 `eth4` was still an access port.
+
+### Resolution
+Both ends of the inter-switch link were configured as 802.1Q trunks:
+
+```text
+Switch1 eth4 <-> Switch3 eth4
+Type: dot1q
+```
+
+### Result
+Same-VLAN hosts successfully communicated across the two switches:
+
+```text
+PC1 <-> PC7  VLAN 10
+PC2 <-> PC8  VLAN 40
+PC3 <-> PC9  VLAN 50
+```
+
+### Lesson Learned
+An 802.1Q trunk must be configured consistently on both sides of a switch-to-switch link.
+
+---
+
+## 12. New VLAN Subnets Did Not Appear in Remote OSPF Routing Tables
+
+### Problem
+After adding router-on-a-stick VLAN interfaces to R1 and R3, the new VLAN networks did not initially appear in remote OSPF routing tables.
+
+### Configuration Added
+
+R1:
+
+```text
+eth0.10 -> Area 0, passive
+eth0.40 -> Area 0, passive
+eth0.50 -> Area 0, passive
+```
+
+R3:
+
+```text
+eth1.20 -> Area 0, passive
+eth1.60 -> Area 0, passive
+eth1.70 -> Area 0, passive
+```
+
+### Root Cause
+The old parent interfaces were still configured under OSPF:
+
+```text
+R1 eth0
+R3 eth1
+```
+
+After router-on-a-stick conversion, those parent interfaces no longer had Layer 3 addresses.
+
+### Resolution
+The stale parent-interface OSPF entries were removed:
+
+R1:
+
+```text
+delete protocols ospf interface eth0
+```
+
+R3:
+
+```text
+delete protocols ospf interface eth1
+```
+
+### Result
+R1 learned:
+
+```text
+10.10.20.0/24
+10.10.60.0/24
+10.10.70.0/24
+```
+
+R3 learned:
+
+```text
+10.10.10.0/24
+10.10.40.0/24
+10.10.50.0/24
+```
+
+### Lesson Learned
+When converting a routed physical interface into a router-on-a-stick parent interface, clean up stale Layer 3 protocol configuration on the parent.
+
+---
+
+## 13. DHCP Relay Needed to Move From Parent Interfaces to VLAN VIFs
+
+### Problem
+The old DHCP relay configuration listened on physical LAN interfaces:
+
+```text
+R1: eth0
+R3: eth1
+```
+
+After router-on-a-stick conversion, those interfaces no longer represented the individual client broadcast domains.
+
+### Resolution
+
+R1 relay listening interfaces were changed to:
+
+```text
+eth0.10
+eth0.40
+eth0.50
+```
+
+R3 relay listening interfaces were changed to:
+
+```text
+eth1.20
+eth1.60
+eth1.70
+```
+
+The centralized DHCP server remained:
+
+```text
+10.10.30.10
+```
+
+### Result
+DHCP worked on all six VLANs and all nine PCs.
+
+Current observed leases:
+
+```text
+PC1  10.10.10.100
+PC7  10.10.10.101
+
+PC2  10.10.40.100
+PC8  10.10.40.101
+
+PC3  10.10.50.100
+PC9  10.10.50.101
+
+PC4  10.10.20.100
+PC5  10.10.60.100
+PC6  10.10.70.100
+```
+
+---
+
+## 14. BIND Logged IPv6 "Network Unreachable" Messages
+
+### Problem
+BIND logs showed failed IPv6 attempts when trying to contact DNS infrastructure.
+
+### Observation
+The lab is intentionally IPv4-focused and does not provide routed IPv6 connectivity.
+
+### Resolution
+BIND was configured for the lab's IPv4 design, including IPv4 forwarding to:
+
+```text
+8.8.8.8
+1.1.1.1
+```
+
+and IPv6 listening was disabled in the BIND options.
+
+### Result
+External DNS forwarding worked successfully.
+
+### Lesson Learned
+IPv6 lookup warnings are not necessarily evidence of an IPv4 DNS failure when the environment intentionally lacks IPv6 routing.
+
+---
+
+## 22. DNS Forwarding Validation
+
+### Test
+The DNS server was queried directly:
+
+```bash
+dig @10.10.30.10 google.com
+```
+
+### Result
+The response showed:
+
+```text
+status: NOERROR
+SERVER: 10.10.30.10#53
+```
+
+and returned an IPv4 address for `google.com`.
+
+### Interpretation
+This confirmed:
+- BIND was listening on `10.10.30.10`.
+- DNS port 53 was reachable.
+- BIND accepted recursive queries.
+- The configured external forwarders worked.
+
+---
+
+## 15. Internal DNS Zone Validation
+
+### Configuration
+An internal authoritative zone was created:
+
+```text
+gns3.lab
+```
+
+Initial records:
+
+```text
+dhcp01.gns3.lab -> 10.10.30.10
+r1.gns3.lab     -> 10.10.100.1
+r2.gns3.lab     -> 10.10.100.2
+r3.gns3.lab     -> 10.10.100.6
+```
+
+### Validation
+The BIND configuration was checked with:
+
+```bash
+sudo named-checkconf
+sudo named-checkzone gns3.lab /etc/bind/db.gns3.lab
+```
+
+The zone validator returned:
+
+```text
+OK
+```
+
+Direct queries returned the expected addresses.
+
+PC1 then successfully resolved and pinged:
+
+```text
+r1.gns3.lab
+dhcp01.gns3.lab
+```
+
+### Result
+The centralized DNS server now provides both:
+- External recursive/forwarded DNS resolution.
+- Internal authoritative DNS for infrastructure names.
+
+---
+
 # Troubleshooting Methodology Used
 
 Across these incidents, the most useful troubleshooting sequence was:

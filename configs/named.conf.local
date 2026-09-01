@@ -1,0 +1,4 @@
+zone "gns3.lab" {
+    type master;
+    file "/etc/bind/db.gns3.lab";
+};
