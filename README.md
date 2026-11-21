@@ -6,12 +6,12 @@ The current architecture uses **VyOS**, **pfSense**, **FortiGate**, **Kea DHCP**
 
 ## Current Topology
 
-![Current GNS3 Firewall Topology](topology/Current-GNS3-Topology.jpg)
+![Current GNS3 Firewall Topology](topology/Current-Topology.png)
 
 The current design is divided into three layers:
 
 - **Perimeter security:** FortiGate between the routed core and the Internet/GNS3 NAT.
-- **Routed core:** R1, R2, and R3 running OSPF Area 0 with redundant paths.
+- **Routed core:** R1, R2, and R3 running OSPF Area 0 with reduSndant paths.
 - **Internal segmentation:** pfSense-Internal protects IT, Finance, and HR; pfSense-Guest protects the Guest network.
 
 Detailed topology documentation is available in [`topology/README.md`](topology/README.md).
@@ -76,33 +76,45 @@ R1, R2, and R3 form a redundant OSPF Area 0 triangle.
                     R1--------R3
 ```
 
+**R1 to Internal Networks**
+
 The protected client networks are no longer directly connected to R1 or R3.
 
-R1 reaches the internal pfSense networks using static routes:
+R1 reaches the IT, Finance, and HR networks behind pfSense-Internal using static routes:
 
-```text
-10.10.10.0/24 -> 10.10.252.2
-10.10.40.0/24 -> 10.10.252.2
-10.10.50.0/24 -> 10.10.252.2
-```
+|Destination network|  Next hop|
+|---|---|
+|`10.10.10.0/24` (IT) |         via `10.10.252.2`|
+|`10.10.40.0/24` (Finance)|         via `10.10.252.2`|
+|`10.10.50.0/24` (HR) |        via `10.10.252.2`|
 
-These routes are selectively redistributed into OSPF.
+`10.10.252.2` is the transit/WAN address of pfSense-Internal.
 
-R3 reaches the Guest network using:
+These static routes are selectively redistributed into OSPF so R2 and R3 can also learn how to reach the IT, Finance, and HR networks.
 
-```text
-10.10.20.0/24 -> 10.10.253.2
-```
+**R3 to Guest Network**
 
-The Guest route is also selectively redistributed into OSPF.
+R3 reaches the Guest network using a static route as well:
 
-R2 uses FortiGate as its upstream default gateway:
+|Destination network|  Next hop|
+|---|---|
+|`10.10.20.0/24` | via `10.10.253.2` | 
 
-```text
-0.0.0.0/0 -> 10.10.254.1
-```
+`10.10.253.2` is the transit/WAN address of pfSense-Guest.
 
-R2 originates the default route into OSPF so R1 and R3 learn Internet reachability dynamically.
+The Guest route is also selectively redistributed into OSPF so R1 and R2 can learn how to reach the Guest network.
+
+**R2 to FortiGate**
+
+R2 uses FortiGate as its upstream gateway for Internet/North-bound traffic:
+
+Destination network|  Next hop|
+|---|---|
+|`0.0.0.0/0` | via `10.10.254.1` | 
+
+`10.10.254.1` is FortiGate's internal-facing interface connected to R2.
+
+R2 originates this default route into OSPF so R1 and R3 dynamically learn that Internet-bound traffic should be forwarded toward R2.
 
 ---
 
@@ -373,4 +385,4 @@ Future areas include:
 - Configuration backup/versioning
 - Structured fault-injection and troubleshooting scenarios
 
-The goal is not only to build a functioning network, but also to practice **design, implementation, verification, troubleshooting, documentation, and security-policy reasoning** across a realistic multi-vendor environment.
+The goal is not only to build a functioning network, but also to practice design, implementation, verification, troubleshooting, documentation, and security-policy reasoning across a realistic multi-vendor environment.

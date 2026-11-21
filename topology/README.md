@@ -14,7 +14,7 @@ The current design separates the network into three major layers:
 
 ### Current GNS3 Topology
 
-![Current GNS3 Firewall Topology](Current-GNS3-Topology.jpg)
+![Current GNS3 Firewall Topology](Current-Topology.png)
 
 ### Logical Overview
 
@@ -109,27 +109,81 @@ R2 also advertises the `10.10.30.0/24` server network into OSPF using its server
 
 ### Protected Networks and OSPF Redistribution
 
+
+| Network | Role | Default Gateway |
+|---|---|---|
+| `10.10.10.0/24` | IT / VLAN 10 | `10.10.10.1` on pfSense-Internal |
+| `10.10.20.0/24` | Guest | `10.10.20.1` on pfSense-Guest |
+| `10.10.30.0/24` | Server network | `10.10.30.1` on R2 |
+| `10.10.40.0/24` | Finance / VLAN 40 | `10.10.40.1` on pfSense-Internal |
+| `10.10.50.0/24` | HR / VLAN 50 | `10.10.50.1` on pfSense-Internal |
+
+### Core / Firewall Transit Networks
+
+| Network | Purpose |
+|---|---|
+| `10.10.100.0/30` | R1-R2 |
+| `10.10.100.4/30` | R2-R3 |
+| `10.10.100.8/30` | R1-R3 |
+| `10.10.252.0/30` | R1-pfSense-Internal |
+| `10.10.253.0/30` | R3-pfSense-Guest |
+| `10.10.254.0/30` | R2-FortiGate |
+
+The full interface addressing plan is documented in [`docs/addressing-plan.md`](docs/addressing-plan.md).
+
+---
+
+## Routing Design
+
+R1, R2, and R3 form a redundant OSPF Area 0 triangle.
+
+```text
+                         R2
+                       /    \
+                      /      \
+                    R1--------R3
+```
+
+**R1 to Internal Networks**
+
 The protected client networks are no longer directly connected to R1 or R3.
 
-R1 has static routes toward pfSense-Internal:
+R1 reaches the IT, Finance, and HR networks behind pfSense-Internal using static routes:
 
-```text
-10.10.10.0/24 -> 10.10.252.2
-10.10.40.0/24 -> 10.10.252.2
-10.10.50.0/24 -> 10.10.252.2
-```
+|Destination network|  Next hop|
+|---|---|
+|`10.10.10.0/24` (IT) |         via `10.10.252.2`|
+|`10.10.40.0/24` (Finance)|         via `10.10.252.2`|
+|`10.10.50.0/24` (HR) |        via `10.10.252.2`|
 
-Those routes are selectively redistributed into OSPF.
+`10.10.252.2` is the transit/WAN address of pfSense-Internal.
 
-R3 has a static route toward pfSense-Guest:
+These static routes are selectively redistributed into OSPF so R2 and R3 can also learn how to reach the IT, Finance, and HR networks.
 
-```text
-10.10.20.0/24 -> 10.10.253.2
-```
+**R3 to Guest Network**
 
-That Guest route is also selectively redistributed into OSPF.
+R3 reaches the Guest network using a static route as well:
 
-This allows the rest of the routed core to learn the protected client networks without making the pfSense firewalls OSPF participants.
+|Destination network|  Next hop|
+|---|---|
+|`10.10.20.0/24` | via `10.10.253.2` | 
+
+`10.10.253.2` is the transit/WAN address of pfSense-Guest.
+
+The Guest route is also selectively redistributed into OSPF so R1 and R2 can learn how to reach the Guest network.
+
+**R2 to FortiGate**
+
+R2 uses FortiGate as its upstream gateway for Internet/North-bound traffic:
+
+Destination network|  Next hop|
+|---|---|
+|`0.0.0.0/0` | via `10.10.254.1` | 
+
+`10.10.254.1` is FortiGate's internal-facing interface connected to R2.
+
+R2 originates this default route into OSPF so R1 and R3 dynamically learn that Internet-bound traffic should be forwarded toward R2.
+
 
 ---
 
