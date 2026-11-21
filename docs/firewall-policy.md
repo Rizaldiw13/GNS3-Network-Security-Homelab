@@ -31,6 +31,8 @@ The former LAN interface `192.168.1.1/24` has been removed.
 
 Rules are evaluated top-down.
 
+![Firewall HQ IT rules](/docs/firewall-rules/Firewall-HQ-IT.png)
+
 | Order | Action | Protocol | Source | Destination | Port | Purpose |
 |---:|---|---|---|---|---|---|
 | 1 | Allow | UDP | Any, source port 68 | `255.255.255.255` | 67 | Allow DHCP client broadcasts |
@@ -44,6 +46,8 @@ Rules are evaluated top-down.
 
 ### Finance Interface Policy
 
+![Firewall HQ Finance rules](/docs/firewall-rules/Firewall-HQ-Finance.png)
+
 | Order | Action | Protocol | Source | Destination | Port | Purpose |
 |---:|---|---|---|---|---|---|
 | 1 | Allow | UDP | Any, source port 68 | `255.255.255.255` | 67 | Allow DHCP client broadcasts |
@@ -54,7 +58,10 @@ Rules are evaluated top-down.
 
 Because the private-network block occurs before the final outbound allow, Finance cannot initiate connections to IT, HR, Guest, or other RFC1918 internal networks.
 
+
 ### HR Interface Policy
+
+![Firewall HQ HR rules](/docs/firewall-rules/Firewall-HQ-HR.png)
 
 | Order | Action | Protocol | Source | Destination | Port | Purpose |
 |---:|---|---|---|---|---|---|
@@ -68,9 +75,10 @@ Because the private-network block occurs before the final outbound allow, HR can
 
 ### WAN Interface Policy
 
-No explicit pass rules are currently configured on the pfSense-Internal WAN interface.
+![Firewall HQ WAN rules](/docs/firewall-rules/Firewall-HQ-WAN.png)
 
-This is intentional.
+
+I intentionally did not configure explicit pass rules on the pfSense-Internal WAN interface.
 
 The WAN interface is the transit link toward R1, not the public Internet. Traffic initiated from IT, Finance, or HR is evaluated when it enters pfSense on the corresponding internal interface. When an allow rule creates a firewall state, related return traffic arriving through WAN is automatically permitted.
 
@@ -90,21 +98,6 @@ Core / remote network initiated traffic
         -> no WAN pass rule
         -> denied by default
 ```
-
-Do **not** enable a blanket "Block private networks" rule on this WAN interface. The WAN is an internal RFC1918 transit network, and legitimate routed traffic from the enterprise core uses private addressing.
-
-If cross-site administration is implemented later, narrowly scoped WAN rules should be added only for the required trusted sources and management protocols.
-
-Example future rule:
-
-```text
-Source: Branch IT subnet
-Destination: This Firewall (self)
-Protocol: TCP
-Port: 443
-Action: Allow
-```
-
 ---
 
 ## 2. pfSense-Guest
