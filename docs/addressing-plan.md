@@ -6,8 +6,6 @@
 
 The lab primarily uses **10.10.0.0/16 (RFC1918)** for internal routed networks.
 
-A separate **192.168.1.0/24** management/native LAN is used on pfSense-Internal for local GUI access from the internal Webterm host.
-
 The GNS3 NAT-facing network is assigned dynamically to the FortiGate WAN interface and is therefore not treated as a fixed part of the internal addressing plan.
 
 ## 2. Network Summary
@@ -25,7 +23,6 @@ The GNS3 NAT-facing network is assigned dynamically to the FortiGate WAN interfa
 | `10.10.252.0` | `/30` | R1-pfSense-Internal transit | R1 `.1`, pfSense-Internal `.2` | Static |
 | `10.10.253.0` | `/30` | R3-pfSense-Guest transit | R3 `.1`, pfSense-Guest `.2` | Static |
 | `10.10.254.0` | `/30` | R2-FortiGate transit | FortiGate `.1`, R2 `.2` | Static |
-| `192.168.1.0` | `/24` | pfSense-Internal management/native LAN | pfSense-Internal `192.168.1.1`; webterm-2 `192.168.1.2` | Static |
 
 ## 3. Infrastructure Interface Addressing
 
@@ -42,7 +39,6 @@ The GNS3 NAT-facing network is assigned dynamically to the FortiGate WAN interfa
 | R3 | `eth1` | `10.10.253.1/30` | pfSense-Guest WAN | Transit to Guest firewall |
 | R3 | `eth2` | `10.10.100.10/30` | R1 `eth2` | Direct R1-R3 OSPF transit |
 | pfSense-Internal | WAN | `10.10.252.2/30` | R1 `eth3` | Upstream routed interface; gateway `10.10.252.1` |
-| pfSense-Internal | LAN / native | `192.168.1.1/24` | Switch1 native/untagged network | Local management / GUI access |
 | pfSense-Internal | IT (VLAN 10) | `10.10.10.1/24` | Switch1 trunk | Default gateway for IT |
 | pfSense-Internal | Finance (VLAN 40) | `10.10.40.1/24` | Switch1 trunk | Default gateway for Finance |
 | pfSense-Internal | HR (VLAN 50) | `10.10.50.1/24` | Switch1 trunk | Default gateway for HR |
@@ -52,13 +48,13 @@ The GNS3 NAT-facing network is assigned dynamically to the FortiGate WAN interfa
 | FortiGate | WAN / `port1` | DHCP from GNS3 NAT | GNS3 NAT node | Internet-facing interface; dynamic address |
 | DHCP01 | `ens3` | `10.10.30.10/24` | R2 `eth2` | Kea DHCPv4 + BIND9 DNS |
 | webterm-1 | `eth0` | `10.10.20.250/24` | Switch2 / Guest LAN | Persistent Guest pfSense management host; gateway `10.10.20.1` |
-| webterm-2 | `eth0` | `192.168.1.2/24` | Switch1 native/untagged network | Persistent pfSense-Internal management host; gateway `192.168.1.1` |
+| webterm-2 | `eth0` | DHCP on `10.10.10.0/24` (observed `10.10.10.102/24`) | Switch1 VLAN 10 | IT workstation; gateway `10.10.10.1`; DNS `10.10.30.10`; allowed to manage pfSense-Internal over HTTPS |
 
 ## 4. VLAN and Client Layout
 
 | VLAN / Network | Department / Role | Gateway | Clients |
 |---|---|---|---|
-| VLAN 10 - `10.10.10.0/24` | IT | `10.10.10.1` | PC1 on Switch1; PC7 on Switch3 |
+| VLAN 10 - `10.10.10.0/24` | IT | `10.10.10.1` | PC1 and webterm-2 on Switch1; PC7 on Switch3 |
 | VLAN 40 - `10.10.40.0/24` | Finance | `10.10.40.1` | PC2 on Switch1; PC8 on Switch3 |
 | VLAN 50 - `10.10.50.0/24` | HR | `10.10.50.1` | PC3 on Switch1; PC9 on Switch3 |
 | `10.10.20.0/24` | Guest | `10.10.20.1` | PC4, PC5, PC6 on Switch2 |
@@ -84,6 +80,7 @@ Client addresses are assigned dynamically by DHCP. The addresses below are examp
 | PC7 | IT / VLAN 10 | DHCP; observed `10.10.10.101/24` |
 | PC8 | Finance / VLAN 40 | DHCP; observed `10.10.40.101/24` |
 | PC9 | HR / VLAN 50 | DHCP; observed `10.10.50.101/24` |
+| webterm-2 | IT / VLAN 10 | DHCP; observed `10.10.10.102/24` |
 
 All current client DHCP scopes distribute:
 
@@ -177,3 +174,21 @@ Server   10.10.30.1 -> R2
 ```
 
 This is an important change from the earlier router-on-a-stick design. R1 and R3 remain part of the routed OSPF core, while the pfSense firewalls now provide the Layer 3 gateways and security-policy enforcement for the protected client networks.
+
+## 10. pfSense-Internal Management Access
+
+The former pfSense-Internal LAN/native management interface `192.168.1.1/24` has been removed because it is no longer used.
+
+Management access is now performed from the IT VLAN through the pfSense-Internal IT interface:
+
+```text
+pfSense-Internal management address: 10.10.10.1
+Protocol: HTTPS (TCP/443)
+Allowed source: IT subnet (10.10.10.0/24)
+```
+
+The IT firewall policy includes an explicit rule allowing IT clients to reach **This Firewall (self)** over TCP/443. This rule is placed above the rule that blocks other private/internal networks.
+
+Finance, HR, and Guest networks are not granted equivalent pfSense-Internal GUI management access.
+
+`webterm-2` now operates as a normal IT workstation and receives its address through DHCP instead of using the retired `192.168.1.0/24` management network.
