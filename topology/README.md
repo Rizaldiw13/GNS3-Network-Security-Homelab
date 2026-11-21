@@ -1,353 +1,346 @@
 # Network Topology
 
-This directory documents the evolution of the GNS3 networking homelab, from the original static-routing design to OSPF redundancy, centralized DHCP/DNS, VLAN segmentation, and Internet connectivity through GNS3 NAT.
+This directory documents the evolution of the GNS3 network-security homelab. The lab began as a small routed network, then added OSPF redundancy, centralized DHCP/DNS, VLAN segmentation, Internet connectivity, and finally dedicated firewall layers using FortiGate and pfSense.
 
 ---
 
-## Previous Topology: Static Routing
+## Current Topology
 
-These static routes were later replaced by OSPF. This diagram is kept to show the original topology before dynamic routing was implemented.
+The current design separates the network into three major layers:
 
-![Static Routing Topology](Starting-Topology.png)
+1. **Perimeter security** — FortiGate between the routed core and the GNS3 NAT/Internet.
+2. **Routed core** — VyOS routers R1, R2, and R3 running OSPF Area 0.
+3. **Internal segmentation** — pfSense-Internal protects IT, Finance, and HR; pfSense-Guest protects the Guest network.
 
----
+### Current GNS3 Topology
 
-## OSPF Routing
+![Current GNS3 Firewall Topology](Current-GNS3-Topology.jpg)
 
-The topology uses OSPFv2 for dynamic IPv4 routing. All three VyOS routers participate in backbone Area 0.
-
-| Router | Router ID | Active OSPF Interfaces |
-|---|---|---|
-| R1 | `1.1.1.1` | `eth1`, `eth2`, `eth0.10`, `eth0.40`, `eth0.50` |
-| R2 | `2.2.2.2` | `eth0`, `eth1`, `eth2` |
-| R3 | `3.3.3.3` | `eth0`, `eth2`, `eth1.20`, `eth1.60`, `eth1.70` |
-
-The VLAN subinterfaces on R1 and R3 are configured as **OSPF passive interfaces**. They advertise the client VLAN networks without attempting to form OSPF adjacencies with end devices.
-
-R2 `eth2` is also configured as an **OSPF passive interface**. The `10.10.30.0/24` server network is advertised into OSPF, but DHCP01 is not an OSPF router.
-
-The parent interfaces `R1 eth0` and `R3 eth1` are used only as 802.1Q trunk parents and are no longer configured as OSPF interfaces.
-
-### OSPF Core Adjacencies
-
-With all router-to-router links operational, the topology forms a triangle:
+### Logical Overview
 
 ```text
-                          Area 0
-
-                         2.2.2.2
-                            R2
-                           /  \
-                          /    \
-                         /      \
-                1.1.1.1 -------- 3.3.3.3
-                   R1                R3
+                           Internet
+                              |
+                          GNS3 NAT
+                              |
+                          FortiGate
+                              |
+                        10.10.254.0/30
+                              |
+                              R2
+                            /    \
+                           /      \
+                         R1--------R3
+                          |        |
+                10.10.252.0/30   10.10.253.0/30
+                          |        |
+                pfSense-Internal  pfSense-Guest
+                          |        |
+                        Switch1   Switch2
+                          |
+                       Switch3
 ```
 
-Transit networks:
+DHCP01/DNS01 is connected directly to R2 on the `10.10.30.0/24` server network.
+
+---
+
+## Network Roles
+
+| Device | Role |
+|---|---|
+| FortiGate | Perimeter firewall between the routed core and GNS3 NAT/Internet |
+| R1 | Core router for the internal-firewall side; OSPF participant |
+| R2 | Core/server router and upstream router toward FortiGate; OSPF participant |
+| R3 | Core router for the Guest-firewall side; OSPF participant |
+| pfSense-Internal | Default gateway, DHCP relay, and security-policy enforcement for IT, Finance, and HR |
+| pfSense-Guest | Default gateway, DHCP relay, and security-policy enforcement for Guest |
+| DHCP01 | Centralized Kea DHCPv4 and BIND9 DNS server |
+| Switch1 | Primary internal access switch and trunk toward pfSense-Internal |
+| Switch3 | Secondary internal access switch connected to Switch1 by 802.1Q trunk |
+| Switch2 | Guest access switch |
+| webterm-IT | DHCP-based IT workstation with HTTPS management access to pfSense-Internal |
+| webterm-1 | Guest-side Webterm used for Guest testing and pfSense-Guest access |
+
+---
+
+## Addressing Summary
+
+| Network | Purpose |
+|---|---|
+| `10.10.10.0/24` | IT VLAN 10 |
+| `10.10.20.0/24` | Guest network |
+| `10.10.30.0/24` | Server network / DHCP01 / DNS01 |
+| `10.10.40.0/24` | Finance VLAN 40 |
+| `10.10.50.0/24` | HR VLAN 50 |
+| `10.10.100.0/30` | R1-R2 transit |
+| `10.10.100.4/30` | R2-R3 transit |
+| `10.10.100.8/30` | Direct R1-R3 transit |
+| `10.10.252.0/30` | R1-pfSense-Internal transit |
+| `10.10.253.0/30` | R3-pfSense-Guest transit |
+| `10.10.254.0/30` | R2-FortiGate transit |
+
+The primary internal address space remains `10.10.0.0/16`.
+
+For detailed interface-by-interface addressing, see [../docs/addressing-plan.md](../docs/addressing-plan.md).
+
+---
+
+## OSPF Core
+
+R1, R2, and R3 form an OSPF Area 0 triangle.
+
+```text
+                         R2
+                       /    \
+                      /      \
+                    R1--------R3
+```
+
+### Core Transit Networks
 
 - R1-R2: `10.10.100.0/30`
 - R2-R3: `10.10.100.4/30`
 - R1-R3: `10.10.100.8/30`
 
-The direct R1-R3 link is normally preferred for traffic between the R1-side and R3-side VLANs.
+The direct R1-R3 link provides an alternate path around R2 for internal routed traffic and allows OSPF to reconverge if one core link fails.
 
-### Simulated R1-R3 Failure
+R2 also advertises the `10.10.30.0/24` server network into OSPF using its server-facing interface as a passive interface.
 
-R1's `eth2` interface was administratively disabled to simulate a link failure:
+### Protected Networks and OSPF Redistribution
 
-```text
-set interfaces ethernet eth2 disable
-```
+The protected client networks are no longer directly connected to R1 or R3.
 
-OSPF automatically recalculated routes through R2.
-
-Normal path:
+R1 has static routes toward pfSense-Internal:
 
 ```text
-R1 -> R3
+10.10.10.0/24 -> 10.10.252.2
+10.10.40.0/24 -> 10.10.252.2
+10.10.50.0/24 -> 10.10.252.2
 ```
 
-Failover path:
+Those routes are selectively redistributed into OSPF.
+
+R3 has a static route toward pfSense-Guest:
 
 ```text
-R1 -> R2 -> R3
+10.10.20.0/24 -> 10.10.253.2
 ```
 
-During the failure test:
+That Guest route is also selectively redistributed into OSPF.
 
-- Cross-VLAN communication continued.
-- DHCP relay continued working.
-- Clients continued reaching DHCP01.
-- Internet access through R2 continued working.
-- No static routes were added manually.
-
-The preferred link was restored with:
-
-```text
-delete interfaces ethernet eth2 disable
-```
+This allows the rest of the routed core to learn the protected client networks without making the pfSense firewalls OSPF participants.
 
 ---
 
-## Current Topology: VLANs, Centralized DHCP/DNS, OSPF, and NAT
+## Internal VLAN and Switching Design
 
-The current lab uses VLAN-based Layer 2 segmentation, router-on-a-stick routing on R1 and R3, centralized DHCP and DNS on DHCP01, OSPF Area 0 between all routers, and Internet access through a GNS3 NAT node connected to R2.
+pfSense-Internal now owns the Layer 3 gateway addresses for IT, Finance, and HR.
 
-### Logical Topology
-
-![Current VLAN, DHCP, and DNS Topology](Centralized%20DHCP%20and%20DNS%20Topology.png)
-
-### Current GNS3 Topology
-
-![Current GNS3 Topology](GNS3-Topology.png)
-
-### Network Summary
-
-| Network | Purpose |
-|---|---|
-| `10.10.10.0/24` | VLAN 10 |
-| `10.10.20.0/24` | VLAN 20 |
-| `10.10.30.0/24` | Server network / DHCP01 |
-| `10.10.40.0/24` | VLAN 40 |
-| `10.10.50.0/24` | VLAN 50 |
-| `10.10.60.0/24` | VLAN 60 |
-| `10.10.70.0/24` | VLAN 70 |
-| `10.10.100.0/30` | R1-R2 transit |
-| `10.10.100.4/30` | R2-R3 transit |
-| `10.10.100.8/30` | Direct R1-R3 transit |
-| `192.168.42.0/24` | GNS3 NAT-facing network |
-
-The internal lab address space is `10.10.0.0/16`.
-
----
-
-## VLAN and Layer 2 Design
-
-### R1 Side
-
-R1 uses `eth0` as an 802.1Q trunk parent.
-
-| VLAN | Subinterface | Gateway | Connected Switches / Clients |
+| VLAN | Network | Gateway | Clients |
 |---|---|---|---|
-| 10 | `eth0.10` | `10.10.10.1/24` | Switch1 and Switch3 |
-| 40 | `eth0.40` | `10.10.40.1/24` | Switch1 and Switch3 |
-| 50 | `eth0.50` | `10.10.50.1/24` | Switch1 and Switch3 |
+| 10 | `10.10.10.0/24` | `10.10.10.1` | PC1, PC7, webterm-IT |
+| 40 | `10.10.40.0/24` | `10.10.40.1` | PC2, PC8 |
+| 50 | `10.10.50.0/24` | `10.10.50.1` | PC3, PC9 |
 
-Switch1 connects directly to R1. Switch1 and Switch3 are joined by an 802.1Q trunk carrying VLANs `10`, `40`, and `50`.
+Switch1 connects to pfSense-Internal using an 802.1Q trunk carrying VLANs 10, 40, and 50.
 
-R1 is **not** directly connected to Switch3.
+Switch1 and Switch3 are also connected by an 802.1Q trunk carrying those same VLANs.
 
-### R3 Side
-
-R3 uses `eth1` as an 802.1Q trunk parent.
-
-| VLAN | Subinterface | Gateway | Connected Switch |
-|---|---|---|---|
-| 20 | `eth1.20` | `10.10.20.1/24` | Switch2 |
-| 60 | `eth1.60` | `10.10.60.1/24` | Switch2 |
-| 70 | `eth1.70` | `10.10.70.1/24` | Switch2 |
-
-### Layer 2 Trunks
-
-| Link | Type | VLANs Carried |
-|---|---|---|
-| R1 `eth0` ↔ Switch1 | 802.1Q trunk | 10, 40, 50 |
-| Switch1 ↔ Switch3 | 802.1Q trunk | 10, 40, 50 |
-| R3 `eth1` ↔ Switch2 | 802.1Q trunk | 20, 60, 70 |
+The old R1 router-on-a-stick subinterfaces `eth0.10`, `eth0.40`, and `eth0.50` were removed after pfSense-Internal took over gateway ownership.
 
 ---
 
-## Key Device Addresses
+## Guest Design
 
-| Device | Interface | Address / Assignment | Role |
-|---|---|---|---|
-| R1 | `eth0.10` | `10.10.10.1/24` | VLAN 10 gateway / DHCP relay |
-| R1 | `eth0.40` | `10.10.40.1/24` | VLAN 40 gateway / DHCP relay |
-| R1 | `eth0.50` | `10.10.50.1/24` | VLAN 50 gateway / DHCP relay |
-| R1 | `eth1` | `10.10.100.1/30` | R1-R2 transit |
-| R1 | `eth2` | `10.10.100.9/30` | Direct R1-R3 transit |
-| R2 | `eth0` | `10.10.100.2/30` | R1-R2 transit |
-| R2 | `eth1` | `10.10.100.5/30` | R2-R3 transit |
-| R2 | `eth2` | `10.10.30.1/24` | Server-network gateway; OSPF passive |
-| R2 | `eth3` | DHCP from GNS3 NAT | Internet-facing interface |
-| R3 | `eth0` | `10.10.100.6/30` | R2-R3 transit |
-| R3 | `eth1.20` | `10.10.20.1/24` | VLAN 20 gateway / DHCP relay |
-| R3 | `eth1.60` | `10.10.60.1/24` | VLAN 60 gateway / DHCP relay |
-| R3 | `eth1.70` | `10.10.70.1/24` | VLAN 70 gateway / DHCP relay |
-| R3 | `eth2` | `10.10.100.10/30` | Direct R1-R3 transit |
-| DHCP01 | `ens3` | `10.10.30.10/24` | Kea DHCP + BIND9 DNS |
-| PC1 | `eth0` | DHCP: `10.10.10.100/24` | VLAN 10 |
-| PC2 | `eth0` | DHCP: `10.10.40.100/24` | VLAN 40 |
-| PC3 | `eth0` | DHCP: `10.10.50.100/24` | VLAN 50 |
-| PC4 | `eth0` | DHCP: `10.10.20.100/24` | VLAN 20 |
-| PC5 | `eth0` | DHCP: `10.10.60.100/24` | VLAN 60 |
-| PC6 | `eth0` | DHCP: `10.10.70.100/24` | VLAN 70 |
-| PC7 | `eth0` | DHCP: `10.10.10.101/24` | VLAN 10 |
-| PC8 | `eth0` | DHCP: `10.10.40.101/24` | VLAN 40 |
-| PC9 | `eth0` | DHCP: `10.10.50.101/24` | VLAN 50 |
-
-R2 `eth3` received `192.168.42.234/24` during testing. This address is dynamically assigned by the GNS3 NAT node and is not guaranteed to remain the same.
-
----
-
-## Centralized DHCP
-
-DHCP is provided by the dedicated Ubuntu server `DHCP01`.
+The Guest network is now a single protected subnet behind pfSense-Guest:
 
 ```text
-DHCP01
-IP: 10.10.30.10/24
-Service: Kea DHCPv4
+10.10.20.0/24
+Gateway: 10.10.20.1
 ```
 
-### DHCP Scopes
+PC4, PC5, PC6, and webterm-1 connect through Switch2.
 
-| VLAN | Subnet | Pool | Default Gateway | DNS Server |
-|---|---|---|---|---|
-| 10 | `10.10.10.0/24` | `10.10.10.100` to `10.10.10.199` | `10.10.10.1` | `10.10.30.10` |
-| 20 | `10.10.20.0/24` | `10.10.20.100` to `10.10.20.199` | `10.10.20.1` | `10.10.30.10` |
-| 40 | `10.10.40.0/24` | `10.10.40.100` to `10.10.40.199` | `10.10.40.1` | `10.10.30.10` |
-| 50 | `10.10.50.0/24` | `10.10.50.100` to `10.10.50.199` | `10.10.50.1` | `10.10.30.10` |
-| 60 | `10.10.60.0/24` | `10.10.60.100` to `10.10.60.199` | `10.10.60.1` | `10.10.30.10` |
-| 70 | `10.10.70.0/24` | `10.10.70.100` to `10.10.70.199` | `10.10.70.1` | `10.10.30.10` |
+The earlier VLAN 60 and VLAN 70 design is no longer part of the current topology.
+
+Guest traffic reaches the routed core through:
+
+```text
+Guest clients
+    |
+Switch2
+    |
+pfSense-Guest
+    |
+10.10.253.0/30
+    |
+R3
+```
+
+---
+
+## Centralized DHCP and DNS
+
+DHCP01 provides both Kea DHCPv4 and BIND9 DNS:
+
+```text
+DHCP01: 10.10.30.10/24
+Gateway: 10.10.30.1
+DNS server distributed to clients: 10.10.30.10
+```
 
 ### DHCP Relay
 
-R1 relays DHCP requests from VLANs 10, 40, and 50 to DHCP01. R3 relays DHCP requests from VLANs 20, 60, and 70 to DHCP01.
+DHCP relay now runs on the pfSense firewalls instead of R1/R3.
+
+pfSense-Internal relays requests from:
+
+- IT
+- Finance
+- HR
+
+pfSense-Guest relays requests from:
+
+- Guest
+
+All requests are forwarded to:
 
 ```text
-Client broadcast
-      |
-      v
-R1 or R3 VLAN subinterface
-      |
-      | DHCP relay
-      v
-DHCP01 (10.10.30.10)
+10.10.30.10
 ```
 
-All nine clients successfully obtained leases from DHCP01.
+This keeps DHCP centralized while allowing the firewalls to remain the default gateways for the protected networks.
 
 ---
 
-## Centralized DNS
+## Internet Path
 
-DHCP01 also runs BIND9 and acts as the DNS server for the lab.
+The current Internet path is:
 
 ```text
-DNS Server: 10.10.30.10
-Internal Zone: gns3.lab
+Client
+  |
+pfSense
+  |
+R1 or R3
+  |
+R2
+  |
+FortiGate
+  |
+GNS3 NAT
+  |
+Internet
 ```
 
-The DHCP scopes distribute `10.10.30.10` as the DNS server to all client VLANs.
+R2 uses a static default route toward FortiGate:
 
-BIND9 provides:
+```text
+0.0.0.0/0 -> 10.10.254.1
+```
 
-- Recursive DNS service for internal clients.
-- Forwarding of external queries to `8.8.8.8` and `1.1.1.1`.
-- Authoritative resolution for the internal `gns3.lab` zone.
+R2 originates the default route into OSPF so R1 and R3 learn Internet reachability dynamically.
 
-Current internal records include:
-
-| Name | Address |
-|---|---|
-| `dhcp01.gns3.lab` | `10.10.30.10` |
-| `r1.gns3.lab` | `10.10.100.1` |
-| `r2.gns3.lab` | `10.10.100.2` |
-| `r3.gns3.lab` | `10.10.100.6` |
-
-Client PCs are not currently assigned static DNS records because their DHCP addresses are dynamic.
-
-DNS testing confirmed that clients can resolve both external names such as `google.com` and internal names such as `r1.gns3.lab` and `dhcp01.gns3.lab`.
+FortiGate provides the perimeter firewall path to the GNS3 NAT node. Its WAN-facing address is obtained dynamically from the NAT node.
 
 ---
 
-## Internet Connectivity and NAT
+## Firewall Segmentation
 
-R2 is the lab's Internet edge router.
+pfSense-Internal enforces policy between IT, Finance, and HR.
 
-The GNS3 NAT node provides an upstream DHCP address and default gateway to R2 `eth3`.
+Current behavior includes:
 
-Observed during testing:
+- IT can reach Finance.
+- IT can reach HR.
+- IT can reach the Guest network for support/troubleshooting.
+- Finance cannot initiate traffic to IT or HR.
+- HR cannot initiate traffic to IT or Finance.
+- Finance and HR can reach DNS01 and the Internet.
+- IT clients can manage pfSense-Internal over HTTPS at `10.10.10.1:443`.
 
-```text
-R2 eth3:     192.168.42.234/24
-NAT gateway: 192.168.42.1
-```
+pfSense-Guest blocks Guest-initiated access to internal private networks while still allowing Guest Internet access.
 
-R2 performs source NAT masquerading for the complete internal address space:
-
-```text
-10.10.0.0/16
-```
-
-R2 also originates the default route `0.0.0.0/0` into OSPF so R1 and R3 learn that Internet-bound traffic should be forwarded toward R2.
-
-Internet connectivity has been verified from multiple client VLANs.
+FortiGate provides the outer perimeter between the routed core and the Internet.
 
 ---
 
-## Current Routing Behavior
+## pfSense-Internal Management
 
-Under normal conditions, traffic between the R1 side and R3 side prefers the direct R1-R3 link.
+The former pfSense-Internal LAN interface `192.168.1.1/24` has been removed.
 
-Example:
-
-```text
-PC2 (VLAN 40)
-    |
-    R1
-    |
-direct R1-R3 link
-    |
-    R3
-    |
-PC5 (VLAN 60)
-```
-
-If the direct R1-R3 link fails:
+Firewall administration now occurs directly from the IT VLAN:
 
 ```text
-PC2
- |
- R1
- |
- R2
- |
- R3
- |
-PC5
+Management address: 10.10.10.1
+Allowed source:      10.10.10.0/24
+Protocol:            HTTPS / TCP 443
 ```
 
-During the tested failure condition:
+`webterm-IT` is a normal DHCP client in VLAN 10 and can manage the firewall using this address.
 
-- OSPF reconverged automatically.
-- Cross-VLAN communication continued.
-- Centralized DHCP continued working.
-- DNS remained reachable.
-- Internet connectivity continued through R2.
+This removes the unused `192.168.1.0/24` management network from the active topology.
+
+---
+
+## Verified Current Behavior
+
+The current topology has been tested successfully for:
+
+- DHCP on IT, Finance, HR, and Guest networks.
+- Centralized DNS resolution through `10.10.30.10`.
+- Internet connectivity from internal and Guest clients.
+- Finance-to-IT and Finance-to-HR isolation.
+- HR-to-IT and HR-to-Finance isolation.
+- IT access to Finance and HR.
+- IT access to Guest for troubleshooting.
+- IT HTTPS management access to pfSense-Internal.
+- Guest isolation from protected internal networks.
+- Removal of the obsolete `192.168.1.1` pfSense-Internal LAN interface.
+
+---
+
+## Historical Evolution
+
+The sections below are retained to show how the lab evolved.
+
+### Original Static-Routing Topology
+
+These static routes were later replaced by OSPF.
+
+![Static Routing Topology](Starting-Topology.png)
+
+### Previous VLAN / Router-on-a-Stick Topology
+
+Before the firewall milestone, R1 and R3 acted as VLAN gateways using router-on-a-stick subinterfaces. DHCP relay also ran directly on the routers.
+
+![Previous Centralized DHCP and DNS Topology](Centralized%20DHCP%20and%20DNS%20Topology.png)
+
+![Previous GNS3 Topology](GNS3-Topology.png)
+
+That design was replaced by the current firewall-based architecture so that routing and security-policy enforcement could be separated more realistically.
 
 ---
 
 ## Current Project State
 
-The lab currently demonstrates:
+The topology now demonstrates:
 
 - Multi-router OSPF Area 0 routing
-- Redundant Layer 3 paths and automatic failover
-- VLAN segmentation
-- 802.1Q trunking
-- Router-on-a-stick inter-VLAN routing
-- Centralized Kea DHCP
-- DHCP relay across routed networks
+- Redundant core paths and OSPF reconvergence
+- Selective redistribution of static protected-network routes
+- 802.1Q VLAN trunking
+- Centralized Kea DHCPv4
+- DHCP relay through pfSense
 - Centralized BIND9 DNS
-- Internal DNS zone hosting
-- External DNS forwarding
-- Source NAT / masquerading
-- OSPF default-route propagation
+- Internal and external DNS resolution
+- Dedicated internal and Guest segmentation firewalls
+- FortiGate perimeter firewalling
+- Controlled inter-VLAN access
+- Guest isolation
+- IT administrative access to protected networks
+- IT-only pfSense GUI management
 - End-to-end Internet connectivity
 
-At this stage, VLANs provide separate Layer 2 broadcast domains, but routing between VLANs is still permitted.
-
-The next planned milestone is to implement **inter-VLAN security controls using VyOS firewall policies / ACL-style rules**.
+The firewall-segmentation milestone is complete.
