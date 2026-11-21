@@ -48,13 +48,13 @@ The GNS3 NAT-facing network is assigned dynamically to the FortiGate WAN interfa
 | FortiGate | WAN / `port1` | DHCP from GNS3 NAT | GNS3 NAT node | Internet-facing interface; dynamic address |
 | DHCP01 | `ens3` | `10.10.30.10/24` | R2 `eth2` | Kea DHCPv4 + BIND9 DNS |
 | webterm-1 | `eth0` | `10.10.20.250/24` | Switch2 / Guest LAN | Persistent Guest pfSense management host; gateway `10.10.20.1` |
-| webterm-2 | `eth0` | DHCP on `10.10.10.0/24` (observed `10.10.10.102/24`) | Switch1 VLAN 10 | IT workstation; gateway `10.10.10.1`; DNS `10.10.30.10`; allowed to manage pfSense-Internal over HTTPS |
+| webterm-IT | `eth0` | DHCP on `10.10.10.0/24` (observed `10.10.10.102/24`) | Switch1 VLAN 10 | IT workstation; gateway `10.10.10.1`; DNS `10.10.30.10`; allowed to manage pfSense-Internal over HTTPS |
 
 ## 4. VLAN and Client Layout
 
 | VLAN / Network | Department / Role | Gateway | Clients |
 |---|---|---|---|
-| VLAN 10 - `10.10.10.0/24` | IT | `10.10.10.1` | PC1 and webterm-2 on Switch1; PC7 on Switch3 |
+| VLAN 10 - `10.10.10.0/24` | IT | `10.10.10.1` | PC1 and webterm-IT on Switch1; PC7 on Switch3 |
 | VLAN 40 - `10.10.40.0/24` | Finance | `10.10.40.1` | PC2 on Switch1; PC8 on Switch3 |
 | VLAN 50 - `10.10.50.0/24` | HR | `10.10.50.1` | PC3 on Switch1; PC9 on Switch3 |
 | `10.10.20.0/24` | Guest | `10.10.20.1` | PC4, PC5, PC6 on Switch2 |
@@ -80,7 +80,7 @@ Client addresses are assigned dynamically by DHCP. The addresses below are examp
 | PC7 | IT / VLAN 10 | DHCP; observed `10.10.10.101/24` |
 | PC8 | Finance / VLAN 40 | DHCP; observed `10.10.40.101/24` |
 | PC9 | HR / VLAN 50 | DHCP; observed `10.10.50.101/24` |
-| webterm-2 | IT / VLAN 10 | DHCP; observed `10.10.10.102/24` |
+| webterm-IT | IT / VLAN 10 | DHCP; observed `10.10.10.102/24` |
 
 All current client DHCP scopes distribute:
 
@@ -191,4 +191,4 @@ The IT firewall policy includes an explicit rule allowing IT clients to reach **
 
 Finance, HR, and Guest networks are not granted equivalent pfSense-Internal GUI management access.
 
-`webterm-2` now operates as a normal IT workstation and receives its address through DHCP instead of using the retired `192.168.1.0/24` management network.
+`webterm-IT` now operates as a normal IT workstation and receives its address through DHCP instead of using the retired `192.168.1.0/24` management network.
