@@ -121,10 +121,13 @@ Action: Allow
 | Order | Action | Protocol | Source | Destination | Purpose |
 |---:|---|---|---|---|---|
 | 1 | Block | Any | Reserved/bogon sources | Any | Block invalid/unallocated source networks |
-| 2 | Allow | IPv4 any | `10.10.10.0/24` | LAN subnets | Allow HQ/IT access to Guest for support |
-| 3 | Allow | ICMP echo request | `10.10.253.1` | `10.10.253.2` | Allow R3 to ping the pfSense-Guest WAN interface |
+| 2 | Allow | TCP | `10.10.10.0/24` | WAN address (`10.10.253.2`) | 443 | Allow HQ IT to manage pfSense-Guest over HTTPS |
+| 3 | Allow | IPv4 any | `10.10.10.0/24` | LAN subnets | Any | Allow HQ/IT access to Guest hosts for support |
+| 4 | Allow | ICMP echo request | `10.10.253.1` | `10.10.253.2` | Any | Allow R3 to ping the pfSense-Guest WAN interface |
 
-The second rule is what currently permits IT clients from `10.10.10.0/24` to initiate connections toward Guest hosts.
+The HTTPS management rule allows trusted IT clients from `10.10.10.0/24` to reach the pfSense-Guest web interface at `https://10.10.253.2`.
+
+The following rule separately permits IT clients from `10.10.10.0/24` to initiate connections toward Guest hosts for support and troubleshooting.
 
 ### Guest LAN Policy
 
@@ -138,32 +141,33 @@ The second rule is what currently permits IT clients from `10.10.10.0/24` to ini
 
 The DNS exception must be above the private-network block because DNS01 (`10.10.30.10`) is itself inside private RFC1918 address space.
 
-### Guest Management Hardening Note
+### Guest Management Hardening
 
-The default pfSense anti-lockout rule currently permits Guest-LAN clients to reach the firewall web interface on ports 80/443.
-
-For a production-style untrusted Guest network, this is broader than desirable.
-
-A future hardening step should replace Guest-side management access with explicit trusted-IT management rules, for example:
+Trusted remote management from the HQ IT network is now explicitly configured on the pfSense-Guest WAN interface:
 
 ```text
-HQ IT -> pfSense-Guest HTTPS/443 -> Allow
-Guest clients -> pfSense-Guest management -> Deny
+Source:      10.10.10.0/24
+Destination: WAN address (10.10.253.2)
+Protocol:    TCP
+Port:        443
+Action:      Allow
 ```
 
-This becomes especially relevant if the R3 side is converted from a Guest network into a second business branch.
+This gives HQ IT a dedicated management path to the pfSense-Guest GUI without requiring broad access from the Guest LAN.
+
+The default pfSense anti-lockout rule on the Guest LAN should only be disabled after the HQ IT management path has been tested successfully. Until that anti-lockout rule is removed, Guest-LAN clients may still be able to reach the firewall web interface on ports 80/443.
 
 ---
 
 ## 3. Effective Segmentation Matrix
 
-| Source | IT | Finance | HR | Guest | DNS01 | Internet | pfSense-Internal GUI |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| IT | Local | Allow | Allow | Allow | DNS allowed | Allow | HTTPS allowed |
-| Finance | Block | Local | Block | Block | DNS allowed | Allow | Block |
-| HR | Block | Block | Local | Block | DNS allowed | Allow | Block |
-| Guest | Block | Block | Block | Local | DNS allowed | Allow | Not intended |
-| Core/other networks | Default deny at pfSense-Internal WAN | Default deny | Default deny | Depends on Guest WAN rules | N/A | N/A | Default deny |
+| Source | IT | Finance | HR | Guest | DNS01 | Internet | pfSense-Internal GUI | pfSense-Guest GUI |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| IT | Local | Allow | Allow | Allow | DNS allowed | Allow | HTTPS allowed | HTTPS allowed |
+| Finance | Block | Local | Block | Block | DNS allowed | Allow | Block | Block |
+| HR | Block | Block | Local | Block | DNS allowed | Allow | Block | Block |
+| Guest | Block | Block | Block | Local | DNS allowed | Allow | Not intended | Anti-lockout remains until removed |
+| Core/other networks | Default deny at pfSense-Internal WAN | Default deny | Default deny | Depends on Guest WAN rules | N/A | N/A | Default deny | Default deny except explicit WAN rules |
 
 ---
 
@@ -223,4 +227,5 @@ The current firewall configuration has been tested successfully for:
 - DNS access from all client networks to `10.10.30.10`.
 - DHCP operation through pfSense relay.
 - IT HTTPS management of pfSense-Internal at `10.10.10.1`.
+- HQ IT HTTPS management of pfSense-Guest at `10.10.253.2`.
 
