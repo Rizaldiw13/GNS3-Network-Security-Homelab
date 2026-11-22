@@ -4,11 +4,9 @@
 
 This document explains the main architectural decisions behind the current GNS3 Network Security Homelab.
 
-The goal is not only to record **what** was configured, but also **why** each design choice was made, what problem it solves, and what trade-offs it introduces.
-
 ---
 
-## 1. Use a Three-Router OSPF Core
+## 1. Three-Router OSPF Core
 
 ### Decision
 
@@ -41,7 +39,7 @@ OSPF is more complex than static routing and requires additional troubleshooting
 
 ---
 
-## 2. Use /30 Networks for Point-to-Point Transit Links
+## 2. /30 Networks for Point-to-Point Transit Links
 
 ### Decision
 
@@ -74,7 +72,7 @@ A `/30` provides exactly two usable host addresses, which fits the current lab d
 
 ---
 
-## 3. Move Employee Default Gateways from R1 to pfSense-Internal
+## 3. Moving Employee Default Gateways from R1 to pfSense-Internal
 
 ### Decision
 
@@ -113,7 +111,7 @@ That requires static routes between R1 and pfSense-Internal.
 
 ---
 
-## 4. Keep pfSense Outside the OSPF Core
+## 4. Keeping pfSense Outside the OSPF Core
 
 ### Decision
 
@@ -164,7 +162,7 @@ However, that added complexity is useful for learning and gives tighter control 
 
 ---
 
-## 5. Keep a Dedicated Server Network on R2
+## 5. Keeping a Dedicated Server Network on R2
 
 ### Decision
 
@@ -193,7 +191,7 @@ R2 advertises this server network into OSPF using its server-facing interface as
 
 ---
 
-## 6. Centralize DHCP and DNS
+## 6. Centralized DHCP and DNS
 
 ### Decision
 
@@ -222,7 +220,7 @@ That is useful for future troubleshooting and resiliency exercises.
 
 ---
 
-## 7. Run DHCP Relay on the Default-Gateway Firewalls
+## 7. Running DHCP Relay on the Default-Gateway Firewalls
 
 ### Decision
 
@@ -257,7 +255,7 @@ It also removes obsolete DHCP-relay configuration from R1 and R3.
 
 ---
 
-## 8. Use FortiGate as the Perimeter Firewall
+## 8. Using FortiGate as the Perimeter Firewall
 
 ### Decision
 
@@ -316,7 +314,7 @@ This keeps Internet routing centralized and allows R1/R3 to learn the default ro
 
 ---
 
-## 10. Use Default-Deny Internal Firewall Policy
+## 10. Using Default-Deny Internal Firewall Policy
 
 ### Decision
 
@@ -351,7 +349,7 @@ Rule order therefore matters.
 
 ---
 
-## 11. Give IT Broader Administrative Access
+## 11. Giving IT Broader Administrative Access
 
 ### Decision
 
@@ -386,7 +384,7 @@ As the lab grows, management traffic can be narrowed by protocol, destination al
 
 ---
 
-## 12. Manage pfSense-Internal from the IT VLAN
+## 12. Managing pfSense-Internal from the IT VLAN
 
 ### Decision
 
@@ -421,7 +419,7 @@ Removing the unused interface:
 
 ---
 
-## 13. Make webterm-IT a Normal DHCP IT Workstation
+## 13. Making webterm-IT a Normal DHCP IT Workstation
 
 ### Decision
 
@@ -447,7 +445,7 @@ Infrastructure devices still use fixed addresses where predictability is require
 
 ---
 
-## 14. Keep Guest Behind a Separate Firewall
+## 14. Keeping Guest Behind a Separate Firewall
 
 ### Decision
 
@@ -485,7 +483,7 @@ IT is also allowed to reach Guest hosts for troubleshooting.
 
 ---
 
-## 15. Leave pfSense-Internal WAN Default-Deny
+## 15. Leaving pfSense-Internal WAN Default-Deny as is
 
 ### Decision
 
@@ -507,7 +505,7 @@ If a second branch is implemented, narrowly scoped WAN management rules can be a
 
 ---
 
-## 16. Preserve Historical Designs Instead of Deleting Them
+## 16. Preserving Historical Designs Instead of Deleting Them
 
 ### Decision
 
