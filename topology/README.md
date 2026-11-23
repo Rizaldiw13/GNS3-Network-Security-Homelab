@@ -313,6 +313,7 @@ Current behavior includes:
 - HR cannot initiate traffic to IT or Finance.
 - Finance and HR can reach DNS01 and the Internet.
 - IT clients can manage pfSense-Internal over HTTPS at `10.10.10.1:443`.
+- HQ IT can manage pfSense-Guest over HTTPS at `10.10.253.2:443` through explicit rules on both pfSense firewalls.
 
 pfSense-Guest blocks Guest-initiated access to internal private networks while still allowing Guest Internet access.
 
@@ -350,6 +351,7 @@ The current topology has been tested successfully for:
 - IT access to Finance and HR.
 - IT access to Guest for troubleshooting.
 - IT HTTPS management access to pfSense-Internal.
+- HQ IT HTTPS management access to pfSense-Guest at `10.10.253.2`.
 - Guest isolation from protected internal networks.
 - Removal of the obsolete `192.168.1.1` pfSense-Internal LAN interface.
 
