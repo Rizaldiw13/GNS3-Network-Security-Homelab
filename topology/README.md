@@ -59,7 +59,7 @@ DHCP01/DNS01 is connected directly to R2 on the `10.10.30.0/24` server network.
 | Switch1 | Primary internal access switch and trunk toward pfSense-Internal |
 | Switch3 | Secondary internal access switch connected to Switch1 by 802.1Q trunk |
 | Switch2 | Guest access switch |
-| webterm-IT | DHCP-based IT workstation with HTTPS management access to pfSense-Internal |
+| webterm-IT | DHCP-based IT administrative workstation with HTTPS management access to pfSense-Internal, pfSense-Guest, and FortiGate |
 | webterm-1 | Guest-side browser-enabled workstation used for Guest-network testing |
 
 ---
@@ -319,6 +319,29 @@ pfSense-Guest blocks Guest-initiated access to internal private networks while s
 
 FortiGate provides the outer perimeter between the routed core and the Internet.
 
+The active FortiGate `Internal-to-Internet` policy permits the `INTERNAL-NETWORKS` object (`10.10.0.0/16`) to use HTTPS, DNS, NTP, and PING from `port2` toward `port1`, with NAT enabled. Traffic that does not match an explicit allow policy falls through to FortiGate's implicit deny behavior.
+
+FortiGate also maintains a static return route for `10.10.0.0/16` via R2 at `10.10.254.2`.
+
+---
+
+## IT Firewall Management Path
+
+The IT VLAN is the trusted administrative network for firewall management.
+
+```text
+webterm-IT
+10.10.10.x
+    |
+    +---- HTTPS ----> pfSense-Internal  10.10.10.1
+    |
+    +---- HTTPS ----> pfSense-Guest     10.10.253.2
+    |
+    +---- HTTPS ----> FortiGate         10.10.254.1
+```
+
+The FortiGate management path traverses pfSense-Internal, R1, and R2 before terminating on FortiGate `port2`. An explicit IT-interface rule on pfSense-Internal permits the trusted IT subnet to reach `10.10.254.1` on TCP/443.
+
 ---
 
 ## pfSense-Internal Management
@@ -352,6 +375,8 @@ The current topology has been tested successfully for:
 - IT access to Guest for troubleshooting.
 - IT HTTPS management access to pfSense-Internal.
 - HQ IT HTTPS management access to pfSense-Guest at `10.10.253.2`.
+- IT HTTPS management access to FortiGate at `10.10.254.1`.
+- FortiGate perimeter egress filtering for HTTPS, DNS, NTP, and PING.
 - Guest isolation from protected internal networks.
 - Removal of the obsolete `192.168.1.1` pfSense-Internal LAN interface.
 
@@ -396,7 +421,7 @@ The topology now demonstrates:
 - Controlled inter-VLAN access
 - Guest isolation
 - IT administrative access to protected networks
-- IT-controlled pfSense GUI management, including remote management of pfSense-Guest
+- IT-controlled firewall GUI management for pfSense-Internal, pfSense-Guest, and FortiGate
 - End-to-end Internet connectivity
 
 The firewall-segmentation milestone is complete.
