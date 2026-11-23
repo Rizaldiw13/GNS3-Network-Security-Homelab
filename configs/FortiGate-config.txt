@@ -1,0 +1,57 @@
+# FortiGate - Sanitized Relevant Configuration Snapshot
+# Captured from:
+#   show system interface
+#   show router static
+#   show firewall policy
+#
+# Only configuration relevant to this homelab is included.
+# Default/inactive FortiGate interfaces and unique identifiers are omitted.
+
+config system interface
+    edit "port1"
+        set vdom "root"
+        set mode dhcp
+        set allowaccess ping
+        set type physical
+        set lldp-reception enable
+        set role wan
+        set snmp-index 1
+    next
+    edit "port2"
+        set vdom "root"
+        set ip 10.10.254.1 255.255.255.252
+        set allowaccess ping https ssh
+        set type physical
+        set device-identification enable
+        set lldp-transmission enable
+        set role lan
+        set snmp-index 2
+    next
+end
+
+# Return route from FortiGate to internal lab networks through R2.
+config router static
+    edit 1
+        set dst 10.10.0.0 255.255.0.0
+        set gateway 10.10.254.2
+        set device "port2"
+    next
+end
+
+# Internal-to-Internet policy.
+# The source address object INTERNAL-NETWORKS is referenced by the running policy.
+# Its object definition is not included in this snapshot.
+config firewall policy
+    edit 1
+        set name "Internal-to-Internet"
+        set srcintf "port2"
+        set dstintf "port1"
+        set action accept
+        set srcaddr "INTERNAL-NETWORKS"
+        set dstaddr "all"
+        set schedule "always"
+        set service "HTTPS" "DNS" "NTP" "PING"
+        set logtraffic all
+        set nat enable
+    next
+end
