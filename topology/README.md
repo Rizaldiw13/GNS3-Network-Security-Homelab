@@ -129,7 +129,7 @@ R2 also advertises the `10.10.30.0/24` server network into OSPF using its server
 | `10.10.253.0/30` | R3-pfSense-Guest |
 | `10.10.254.0/30` | R2-FortiGate |
 
-The full interface addressing plan is documented in [`docs/addressing-plan.md`](docs/addressing-plan.md).
+The full interface addressing plan is documented in [`../docs/addressing-plan.md`](../docs/addressing-plan.md).
 
 ---
 
