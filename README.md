@@ -11,7 +11,7 @@ The current architecture uses **VyOS**, **pfSense**, **FortiGate**, **Kea DHCP**
 The current design is divided into three layers:
 
 - **Perimeter security:** FortiGate between the routed core and the Internet/GNS3 NAT.
-- **Routed core:** R1, R2, and R3 running OSPF Area 0 with reduSndant paths.
+- **Routed core:** R1, R2, and R3 running OSPF Area 0 with redundant paths.
 - **Internal segmentation:** pfSense-Internal protects IT, Finance, and HR; pfSense-Guest protects the Guest network.
 
 Detailed topology documentation is available in [`topology/README.md`](topology/README.md).
@@ -190,6 +190,7 @@ Verified policy behavior includes:
 | IT / Finance / HR | DNS01 | Allow required DNS traffic |
 | IT / Finance / HR | Internet | Allow |
 | IT | pfSense-Internal HTTPS GUI | Allow |
+| IT | pfSense-Guest HTTPS GUI (`10.10.253.2:443`) | Allow |
 
 All IT clients are permitted to manage pfSense-Internal over:
 
@@ -207,6 +208,15 @@ pfSense-Guest protects the Guest network.
 Guest clients can reach the Internet but cannot initiate traffic into protected internal networks.
 
 IT is explicitly allowed to reach the Guest network so IT staff can troubleshoot Guest endpoints.
+
+HQ IT can also manage pfSense-Guest remotely at:
+
+```text
+https://10.10.253.2
+TCP/443
+```
+
+This management path is explicitly permitted by both pfSense-Internal and pfSense-Guest.
 
 ### FortiGate
 
@@ -295,6 +305,7 @@ The lab was redesigned from router-based inter-VLAN routing into a firewall-base
 - Isolated Guest from protected internal networks.
 - Allowed IT administrative access to Finance, HR, and Guest.
 - Restricted pfSense-Internal GUI management to IT clients over HTTPS.
+- Added explicit HQ IT management access to pfSense-Guest over HTTPS/TCP 443.
 - Preserved centralized DHCP, DNS, and Internet access.
 
 The **firewall-segmentation milestone is complete**.
