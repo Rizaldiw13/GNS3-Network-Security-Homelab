@@ -42,9 +42,9 @@ Rules are evaluated top-down.
 | 5 | Allow | IPv4 any | IT subnets | `10.10.20.0/24` | Any | Allow IT to reach Guest for support |
 | 6 | Allow | TCP | IT subnets | This Firewall (self) | 443 | Allow IT clients to manage pfSense-Internal over HTTPS |
 | 7 | Allow | TCP | IT subnets | Guest Network Firewall | 443 | Allow IT clients to manage pfSense-Guest over HTTPS |
-| 7 | Allow | TCP | IT subnets | Fortigate Firewall | 443 | Allow IT clients to manage Fortigate over HTTPS |
-| 8 | Block | IPv4 any | IT subnets | `PRIVATE_NETWORKS` | Any | Block other private/internal networks not explicitly allowed above |
-| 9 | Allow | IPv4 any | IT subnets | Any | Any | Allow Internet/non-private destinations |
+| 8 | Allow | TCP | IT subnets | FortiGate Firewall (`10.10.254.1`) | 443 | Allow IT clients to manage FortiGate over HTTPS |
+| 9 | Block | IPv4 any | IT subnets | `PRIVATE_NETWORKS` | Any | Block other private/internal networks not explicitly allowed above |
+| 10 | Allow | IPv4 any | IT subnets | Any | Any | Allow Internet/non-private destinations |
 
 ### Finance Interface Policy
 
@@ -239,17 +239,25 @@ The current interface-level management settings are:
 
 The `allowaccess` settings control access to the FortiGate itself and are separate from transit firewall policies.
 
+HTTPS management from the IT network has been verified at:
+
+```text
+https://10.10.254.1
+```
+
+pfSense-Internal contains a corresponding IT-interface rule allowing TCP/443 to `10.10.254.1` above the broader private-network block. Although FortiGate `port2` also permits SSH at the interface level, SSH management from `webterm-IT` has not yet been recorded as a verified test in this milestone.
+
 ---
 
 ## 4. Effective Segmentation Matrix
 
-| Source | IT | Finance | HR | Guest | DNS01 | Internet | pfSense-Internal GUI | pfSense-Guest GUI |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| IT | Local | Allow | Allow | Allow | DNS allowed | Allow | HTTPS allowed | HTTPS allowed |
-| Finance | Block | Local | Block | Block | DNS allowed | Allow | Block | Block |
-| HR | Block | Block | Local | Block | DNS allowed | Allow | Block | Block |
-| Guest | Block | Block | Block | Local | DNS allowed | Allow | Not intended | Blocked |
-| Core/other networks | Default deny at pfSense-Internal WAN | Default deny | Default deny | Depends on Guest WAN rules | N/A | N/A | Default deny | Default deny except explicit WAN rules |
+| Source | IT | Finance | HR | Guest | DNS01 | Internet | pfSense-Internal GUI | pfSense-Guest GUI | FortiGate GUI |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| IT | Local | Allow | Allow | Allow | DNS allowed | Allow | HTTPS allowed | HTTPS allowed | HTTPS allowed |
+| Finance | Block | Local | Block | Block | DNS allowed | Allow | Block | Block | Block |
+| HR | Block | Block | Local | Block | DNS allowed | Allow | Block | Block | Block |
+| Guest | Block | Block | Block | Local | DNS allowed | Allow | Not intended | Blocked | Block |
+| Core/other networks | Default deny at pfSense-Internal WAN | Default deny | Default deny | Depends on Guest WAN rules | N/A | N/A | Default deny | Default deny except explicit WAN rules | Management controlled by FortiGate interface settings |
 
 ---
 
@@ -313,4 +321,5 @@ The current firewall configuration has been tested successfully for:
 - Guest-LAN automatic webConfigurator access removed by disabling the pfSense anti-lockout rule.
 - FortiGate return route to `10.10.0.0/16` via R2 at `10.10.254.2`.
 - FortiGate `Internal-to-Internet` policy using `INTERNAL-NETWORKS` (`10.10.0.0/16`), NAT, and the explicitly allowed HTTPS/DNS/NTP/PING services.
+- IT HTTPS management of FortiGate at `10.10.254.1`.
 
