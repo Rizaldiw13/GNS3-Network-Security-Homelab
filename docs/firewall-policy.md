@@ -1,6 +1,6 @@
 # Firewall Policy
 
-**Updated:** 2026-11-21
+**Updated:** 2026-11-23
 
 This document records the active firewall policy for the current GNS3 Network Security Homelab.
 
@@ -151,23 +151,108 @@ Action:      Allow
 
 This gives HQ IT a dedicated management path to the pfSense-Guest GUI without requiring broad access from the Guest LAN.
 
-The default pfSense anti-lockout rule on the Guest LAN should only be disabled after the HQ IT management path has been tested successfully. Until that anti-lockout rule is removed, Guest-LAN clients may still be able to reach the firewall web interface on ports 80/443.
+The default pfSense webConfigurator anti-lockout rule on the Guest LAN has been disabled. Guest clients therefore no longer receive automatic GUI access on ports 80/443. Management of pfSense-Guest is now controlled by the explicit HQ IT rule.
+
+The intended management behavior is:
+
+```text
+HQ IT -> pfSense-Guest HTTPS/443 -> Allow
+Guest clients -> pfSense-Guest GUI -> Block
+```
 
 ---
 
-## 3. Effective Segmentation Matrix
+## 3. FortiGate Perimeter Firewall
+
+FortiGate provides the perimeter security boundary between R2 and the GNS3 NAT/Internet side.
+
+### Interfaces
+
+| Interface | Address / Assignment | Role |
+|---|---|---|
+| `port1` | DHCP from GNS3 NAT | Internet-facing/WAN interface |
+| `port2` | `10.10.254.1/30` | Internal transit toward R2 |
+
+R2 uses `10.10.254.2/30` on the opposite side of the transit link.
+
+### Internal Network Address Object
+
+The perimeter policy uses the FortiGate address object:
+
+```text
+Name:    INTERNAL-NETWORKS
+Subnet:  10.10.0.0/16
+```
+
+This represents the lab's internal routed address space.
+
+### Static Return Route
+
+FortiGate has a static route back toward the internal lab networks:
+
+| **Destination network** | **Next hop** | **Interface** |
+|---|---|---|
+| `10.10.0.0/16` | via `10.10.254.2` | `port2` |
+
+This route tells FortiGate to send return traffic for internal `10.10.0.0/16` destinations back to R2.
+
+### Internal-to-Internet Policy
+
+The active FortiGate firewall policy is:
+
+| Action | Source interface | Destination interface | Source | Destination | Allowed services | NAT | Logging |
+|---|---|---|---|---|---|---|---|
+| Allow | `port2` | `port1` | `INTERNAL-NETWORKS` | Any | HTTPS, DNS, NTP, PING | Enabled | All traffic |
+
+The rule is named:
+
+```text
+Internal-to-Internet
+```
+
+This means the perimeter firewall does **not** currently provide unrestricted outbound access. Only the services explicitly listed in the policy are allowed through this rule:
+
+- HTTPS
+- DNS
+- NTP
+- ICMP/PING
+
+NAT is enabled on the policy so internal RFC1918 addresses can reach destinations beyond the FortiGate WAN interface.
+
+### Inbound / Unsolicited Traffic
+
+No general `port1 -> port2` inbound firewall policy is configured in the captured ruleset.
+
+As a result, unsolicited inbound connections from the GNS3 NAT/Internet side do not have a matching allow policy toward the internal network.
+
+Return traffic for sessions initiated through the permitted `Internal-to-Internet` policy is handled statefully by FortiGate.
+
+### Management Access
+
+The current interface-level management settings are:
+
+| Interface | Allowed administrative access |
+|---|---|
+| `port1` | PING |
+| `port2` | PING, HTTPS, SSH |
+
+The `allowaccess` settings control access to the FortiGate itself and are separate from transit firewall policies.
+
+---
+
+## 4. Effective Segmentation Matrix
 
 | Source | IT | Finance | HR | Guest | DNS01 | Internet | pfSense-Internal GUI | pfSense-Guest GUI |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | IT | Local | Allow | Allow | Allow | DNS allowed | Allow | HTTPS allowed | HTTPS allowed |
 | Finance | Block | Local | Block | Block | DNS allowed | Allow | Block | Block |
 | HR | Block | Block | Local | Block | DNS allowed | Allow | Block | Block |
-| Guest | Block | Block | Block | Local | DNS allowed | Allow | Not intended | Anti-lockout remains until removed |
+| Guest | Block | Block | Block | Local | DNS allowed | Allow | Not intended | Blocked |
 | Core/other networks | Default deny at pfSense-Internal WAN | Default deny | Default deny | Depends on Guest WAN rules | N/A | N/A | Default deny | Default deny except explicit WAN rules |
 
 ---
 
-## 4. Stateful Firewall Behavior
+## 5. Stateful Firewall Behavior
 
 pfSense is stateful.
 
@@ -190,7 +275,7 @@ This does **not** mean Finance is allowed to initiate a new connection toward IT
 
 ---
 
-## 5. Policy Design Principles
+## 6. Policy Design Principles
 
 The current ruleset follows these principles:
 
@@ -204,7 +289,7 @@ The current ruleset follows these principles:
 
 ---
 
-## 6. Current Verified Behavior
+## 7. Current Verified Behavior
 
 The current firewall configuration has been tested successfully for:
 
@@ -224,4 +309,7 @@ The current firewall configuration has been tested successfully for:
 - DHCP operation through pfSense relay.
 - IT HTTPS management of pfSense-Internal at `10.10.10.1`.
 - HQ IT HTTPS management of pfSense-Guest at `10.10.253.2`.
+- Guest-LAN automatic webConfigurator access removed by disabling the pfSense anti-lockout rule.
+- FortiGate return route to `10.10.0.0/16` via R2 at `10.10.254.2`.
+- FortiGate `Internal-to-Internet` policy using `INTERNAL-NETWORKS` (`10.10.0.0/16`), NAT, and the explicitly allowed HTTPS/DNS/NTP/PING services.
 
