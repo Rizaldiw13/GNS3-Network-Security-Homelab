@@ -48,7 +48,7 @@ The GNS3 NAT-facing network is assigned dynamically to the FortiGate WAN interfa
 | FortiGate | WAN / `port1` | DHCP from GNS3 NAT | GNS3 NAT node | Internet-facing interface; dynamic address |
 | DHCP01 | `ens3` | `10.10.30.10/24` | R2 `eth2` | Kea DHCPv4 + BIND9 DNS |
 | webterm-1 | `eth0` | `10.10.20.250/24` | Switch2 / Guest LAN | Guest-side browser/test workstation; gateway `10.10.20.1` |
-| webterm-IT | `eth0` | DHCP on `10.10.10.0/24` (observed `10.10.10.102/24`) | Switch1 VLAN 10 | IT workstation; gateway `10.10.10.1`; DNS `10.10.30.10`; allowed to manage pfSense-Internal over HTTPS |
+| webterm-IT | `eth0` | DHCP on `10.10.10.0/24` (observed `10.10.10.102/24`) | Switch1 VLAN 10 | IT administrative workstation; gateway `10.10.10.1`; DNS `10.10.30.10`; HTTPS management access to pfSense-Internal, pfSense-Guest, and FortiGate |
 
 ## 4. VLAN and Client Layout
 
@@ -192,3 +192,24 @@ The IT firewall policy includes an explicit rule allowing IT clients to reach **
 Finance, HR, and Guest networks are not granted equivalent pfSense-Internal GUI management access.
 
 `webterm-IT` now operates as a normal IT workstation and receives its address through DHCP instead of using the retired `192.168.1.0/24` management network.
+
+
+---
+
+## 11. FortiGate Management Access
+
+FortiGate is managed from the trusted IT network using its internal-facing `port2` address:
+
+```text
+FortiGate management address: 10.10.254.1
+Protocol: HTTPS (TCP/443)
+Allowed source: IT subnet (10.10.10.0/24)
+```
+
+The management traffic reaches FortiGate through the routed core:
+
+```text
+IT VLAN -> pfSense-Internal -> R1 -> R2 -> FortiGate port2
+```
+
+The FortiGate interface itself is configured to allow HTTPS management on `port2`. pfSense-Internal has a corresponding IT-interface exception above the private-network block so the trusted IT subnet can reach `10.10.254.1:443`.
