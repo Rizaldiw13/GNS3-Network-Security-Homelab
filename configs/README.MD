@@ -1,6 +1,7 @@
 # Configuration Files
 
 This directory contains sanitized, human-readable configuration snapshots for the routing and infrastructure services used in the GNS3 Network Security Homelab.
+This directory contains sanitized (sensitive info omitted) configuration snapshots for the routing and infrastructure services used in this homelab.
 
 The purpose of this folder is to keep the important lab configuration version-controlled, readable, and easy to reference during troubleshooting or future rebuilds.
 
