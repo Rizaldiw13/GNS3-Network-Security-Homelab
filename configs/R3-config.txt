@@ -1,138 +1,54 @@
-interfaces {
-    ethernet eth0 {
-        address 10.10.100.6/30
-        hw-id 0c:5c:5b:57:00:00
-        offload {
-            gro
-        }
-    }
-    ethernet eth1 {
-        hw-id 0c:5c:5b:57:00:01
-        offload {
-            gro
-        }
-        vif 20 {
-            address 10.10.20.1/24
-        }
-        vif 60 {
-            address 10.10.60.1/24
-        }
-        vif 70 {
-            address 10.10.70.1/24
-        }
-    }
-    ethernet eth2 {
-        address 10.10.100.10/30
-        hw-id 0c:5c:5b:57:00:02
-        offload {
-            gro
-        }
-    }
-    ethernet eth3 {
-        hw-id 0c:5c:5b:57:00:03
-        offload {
-            gro
-        }
-    }
-    loopback lo {
-    }
-}
+# R3 - Current VyOS configuration
+# Updated from "show configuration commands"
+# Authentication secrets are intentionally redacted before committing.
 
-protocols {
-    ospf {
-        interface eth0 {
-            area 0
-        }
-        interface eth1.20 {
-            area 0
-            passive {
-            }
-        }
-        interface eth1.60 {
-            area 0
-            passive {
-            }
-        }
-        interface eth1.70 {
-            area 0
-            passive {
-            }
-        }
-        interface eth2 {
-            area 0
-        }
-        parameters {
-            router-id 3.3.3.3
-        }
-    }
-    static {
-    }
-}
+set interfaces ethernet eth0 address '10.10.100.6/30'
+set interfaces ethernet eth0 hw-id '0c:5c:5b:57:00:00'
+set interfaces ethernet eth0 offload gro
+set interfaces ethernet eth1 address '10.10.253.1/30'
+set interfaces ethernet eth1 hw-id '0c:5c:5b:57:00:01'
+set interfaces ethernet eth1 offload gro
+set interfaces ethernet eth2 address '10.10.100.10/30'
+set interfaces ethernet eth2 hw-id '0c:5c:5b:57:00:02'
+set interfaces ethernet eth2 offload gro
+set interfaces ethernet eth3 hw-id '0c:5c:5b:57:00:03'
+set interfaces ethernet eth3 offload gro
+set interfaces loopback lo
 
-service {
-    dhcp-relay {
-        listen-interface eth1.20
-        listen-interface eth1.60
-        listen-interface eth1.70
-        server 10.10.30.10
-        upstream-interface eth2
-        upstream-interface eth0
-    }
-    ntp {
-        allow-client {
-            address 127.0.0.0/8
-            address 169.254.0.0/16
-            address 10.0.0.0/8
-            address 172.16.0.0/12
-            address 192.168.0.0/16
-            address ::1/128
-            address fe80::/10
-            address fc00::/7
-        }
-        server time1.vyos.net {
-        }
-        server time2.vyos.net {
-        }
-        server time3.vyos.net {
-        }
-    }
-}
+set policy prefix-list GUEST-VLAN rule 10 action 'permit'
+set policy prefix-list GUEST-VLAN rule 10 prefix '10.10.20.0/24'
 
-system {
-    config-management {
-        commit-revisions 100
-    }
-    console {
-        device ttyS0 {
-            kernel
-            speed 115200
-        }
-    }
-    host-name vyos
-    login {
-        operator-group default {
-            command-policy {
-                allow "*"
-            }
-        }
-        user vyos {
-            authentication {
-                encrypted-password ****************
-                plaintext-password ****************
-            }
-        }
-    }
-    option {
-        reboot-on-upgrade-failure 5
-    }
-    syslog {
-        local {
-            facility all {
-                level info
-            }
-            facility local7 {
-                level debug
-            }
-        }
-    }
-}
+set policy route-map REDIST-GUEST rule 10 action 'permit'
+set policy route-map REDIST-GUEST rule 10 match ip address prefix-list 'GUEST-VLAN'
+set policy route-map REDIST-GUEST rule 20 action 'deny'
+
+set protocols ospf interface eth0 area '0'
+set protocols ospf interface eth1 area '0'
+set protocols ospf interface eth1 passive
+set protocols ospf interface eth2 area '0'
+set protocols ospf redistribute static route-map 'REDIST-GUEST'
+
+set protocols static route 10.10.20.0/24 next-hop 10.10.253.2
+
+set service ntp allow-client address '127.0.0.0/8'
+set service ntp allow-client address '169.254.0.0/16'
+set service ntp allow-client address '10.0.0.0/8'
+set service ntp allow-client address '172.16.0.0/12'
+set service ntp allow-client address '192.168.0.0/16'
+set service ntp allow-client address '::1/128'
+set service ntp allow-client address 'fe80::/10'
+set service ntp allow-client address 'fc00::/7'
+set service ntp server time1.vyos.net
+set service ntp server time2.vyos.net
+set service ntp server time3.vyos.net
+
+set system config-management commit-revisions '100'
+set system console device ttyS0 kernel
+set system console device ttyS0 speed '115200'
+set system host-name 'vyos'
+set system login operator-group default command-policy allow '*'
+set system login user vyos authentication encrypted-password '<REDACTED>'
+set system login user vyos authentication plaintext-password ''
+set system option reboot-on-upgrade-failure '5'
+set system syslog local facility all level 'info'
+set system syslog local facility local7 level 'debug'
