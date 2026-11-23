@@ -14,7 +14,7 @@ During the initial GNS3 setup, VMware Workstation repeatedly reported that VMwar
 
 ### Investigation
 
-We checked Windows features and settings that can keep the Microsoft hypervisor active, including:
+Checked Windows features and settings that can keep the Microsoft hypervisor active, including:
 
 - Memory Integrity / Core Isolation
 - Hyper-V-related Windows Features
@@ -33,9 +33,9 @@ bcdedit /set hypervisorlaunchtype off
 
 Conflicting Hyper-V and virtualization-based security features were disabled so VMware Workstation could run the GNS3 VM reliably.
 
-### Lesson Learned
+### Later Architecture Change/Lesson Learned
 
-A GNS3 problem can originate below GNS3 itself. Host virtualization settings should be checked before assuming the topology or GNS3 VM is at fault.
+This VMware-based workaround was temporary. The lab was later migrated from VMware Workstation to Hyper-V, Hyper-V/VBS were re-enabled, and the GNS3 VM was redeployed using the Hyper-V version. The current homelab now runs on Hyper-V with nested virtualization enabled.
 
 ---
 
