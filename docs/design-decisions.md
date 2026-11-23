@@ -479,7 +479,17 @@ https://10.10.253.2
 TCP 443
 ```
 
-IT is also allowed to reach Guest hosts for troubleshooting.
+Because this traffic crosses both segmentation firewalls, the management path is explicitly allowed at both enforcement points:
+
+```text
+pfSense-Internal:
+10.10.10.0/24 -> 10.10.253.2 TCP/443 -> Allow
+
+pfSense-Guest WAN:
+10.10.10.0/24 -> WAN address TCP/443 -> Allow
+```
+
+This has been verified from the HQ IT network. IT is also allowed to reach Guest hosts for troubleshooting.
 
 ---
 
