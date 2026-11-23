@@ -47,7 +47,7 @@ The GNS3 NAT-facing network is assigned dynamically to the FortiGate WAN interfa
 | FortiGate | `port2` | `10.10.254.1/30` | R2 `eth3` | Internal/perimeter transit toward R2 |
 | FortiGate | WAN / `port1` | DHCP from GNS3 NAT | GNS3 NAT node | Internet-facing interface; dynamic address |
 | DHCP01 | `ens3` | `10.10.30.10/24` | R2 `eth2` | Kea DHCPv4 + BIND9 DNS |
-| webterm-1 | `eth0` | `10.10.20.250/24` | Switch2 / Guest LAN | Persistent Guest pfSense management host; gateway `10.10.20.1` |
+| webterm-1 | `eth0` | `10.10.20.250/24` | Switch2 / Guest LAN | Guest-side browser/test workstation; gateway `10.10.20.1` |
 | webterm-IT | `eth0` | DHCP on `10.10.10.0/24` (observed `10.10.10.102/24`) | Switch1 VLAN 10 | IT workstation; gateway `10.10.10.1`; DNS `10.10.30.10`; allowed to manage pfSense-Internal over HTTPS |
 
 ## 4. VLAN and Client Layout
