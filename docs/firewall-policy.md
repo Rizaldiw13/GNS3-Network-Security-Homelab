@@ -41,8 +41,9 @@ Rules are evaluated top-down.
 | 4 | Allow | IPv4 any | IT subnets | HR subnets | Any | Allow IT to manage/reach HR |
 | 5 | Allow | IPv4 any | IT subnets | `10.10.20.0/24` | Any | Allow IT to reach Guest for support |
 | 6 | Allow | TCP | IT subnets | This Firewall (self) | 443 | Allow IT clients to manage pfSense-Internal over HTTPS |
-| 7 | Block | IPv4 any | IT subnets | `PRIVATE_NETWORKS` | Any | Block other private/internal networks not explicitly allowed above |
-| 8 | Allow | IPv4 any | IT subnets | Any | Any | Allow Internet/non-private destinations |
+| 7 | Allow | TCP | IT subnets | `10.10.253.2` | 443 | Allow IT to reach the pfSense-Guest management interface |
+| 8 | Block | IPv4 any | IT subnets | `PRIVATE_NETWORKS` | Any | Block other private/internal networks not explicitly allowed above |
+| 9 | Allow | IPv4 any | IT subnets | Any | Any | Allow Internet/non-private destinations |
 
 ### Finance Interface Policy
 
@@ -118,7 +119,12 @@ Core / remote network initiated traffic
 | 3 | Allow | IPv4 any | `10.10.10.0/24` | LAN subnets | Any | Allow HQ/IT access to Guest hosts for support |
 | 4 | Allow | ICMP echo request | `10.10.253.1` | `10.10.253.2` | Any | Allow R3 to ping the pfSense-Guest WAN interface |
 
-The HTTPS management rule allows trusted IT clients from `10.10.10.0/24` to reach the pfSense-Guest web interface at `https://10.10.253.2`.
+The complete HQ IT management path requires matching permission on both firewalls:
+
+- **pfSense-Internal IT interface:** allow `10.10.10.0/24` to `10.10.253.2` on TCP/443.
+- **pfSense-Guest WAN interface:** allow `10.10.10.0/24` to the WAN address `10.10.253.2` on TCP/443.
+
+This path has been tested successfully from the IT network using `https://10.10.253.2`.
 
 The following rule separately permits IT clients from `10.10.10.0/24` to initiate connections toward Guest hosts for support and troubleshooting.
 
@@ -220,5 +226,5 @@ The current firewall configuration has been tested successfully for:
 - DNS access from all client networks to `10.10.30.10`.
 - DHCP operation through pfSense relay.
 - IT HTTPS management of pfSense-Internal at `10.10.10.1`.
-- HQ IT HTTPS management of pfSense-Guest at `10.10.253.2`.
+- HQ IT HTTPS management of pfSense-Guest at `10.10.253.2`, through explicit TCP/443 rules on both pfSense-Internal and pfSense-Guest.
 
