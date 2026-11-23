@@ -190,6 +190,8 @@ Verified policy behavior includes:
 | IT / Finance / HR | DNS01 | Allow required DNS traffic |
 | IT / Finance / HR | Internet | Allow |
 | IT | pfSense-Internal HTTPS GUI | Allow |
+| IT | pfSense-Guest HTTPS GUI | Allow |
+| IT | FortiGate HTTPS GUI | Allow |
 
 All IT clients are permitted to manage pfSense-Internal over:
 
@@ -212,6 +214,36 @@ IT is explicitly allowed to reach the Guest network so IT staff can troubleshoot
 
 FortiGate acts as the perimeter firewall between R2 and the GNS3 NAT/Internet.
 
+The active perimeter policy uses the `INTERNAL-NETWORKS` address object:
+
+```text
+INTERNAL-NETWORKS = 10.10.0.0/16
+```
+
+Outbound traffic from the internal routed network is explicitly permitted for:
+
+- HTTPS
+- DNS
+- NTP
+- ICMP/PING
+
+NAT is enabled on the `Internal-to-Internet` policy. Traffic that does not match an explicit FortiGate allow policy falls through to FortiGate's implicit deny behavior.
+
+FortiGate also has a return route for the internal address space:
+
+```text
+10.10.0.0/16 -> via 10.10.254.2 -> port2
+```
+
+Trusted IT clients can remotely manage the FortiGate GUI at:
+
+```text
+https://10.10.254.1
+TCP/443
+```
+
+This management path has been verified from `webterm-IT`.
+
 ---
 
 ## Current Endpoint Layout
@@ -230,7 +262,7 @@ FortiGate acts as the perimeter firewall between R2 and the GNS3 NAT/Internet.
 | webterm-IT | IT, DHCP client, browser-enabled workstation |
 | webterm-1 | Guest-side browser-enabled workstation |
 
-`webterm-IT` currently receives its address through DHCP and is used to test real application-layer access such as HTTPS management and web browsing.
+`webterm-IT` currently receives its address through DHCP and represents an IT administrative workstation. It is used for application-layer testing, web browsing, and HTTPS management of pfSense-Internal, pfSense-Guest, and FortiGate.
 
 ---
 
@@ -295,6 +327,9 @@ The lab was redesigned from router-based inter-VLAN routing into a firewall-base
 - Isolated Guest from protected internal networks.
 - Allowed IT administrative access to Finance, HR, and Guest.
 - Restricted pfSense-Internal GUI management to IT clients over HTTPS.
+- Added trusted IT HTTPS management of pfSense-Guest.
+- Added trusted IT HTTPS management of FortiGate at `10.10.254.1`.
+- Enforced FortiGate perimeter egress filtering for HTTPS, DNS, NTP, and PING with implicit deny for unmatched traffic.
 - Preserved centralized DHCP, DNS, and Internet access.
 
 The **firewall-segmentation milestone is now complete!**
