@@ -42,6 +42,7 @@ Rules are evaluated top-down.
 | 5 | Allow | IPv4 any | IT subnets | `10.10.20.0/24` | Any | Allow IT to reach Guest for support |
 | 6 | Allow | TCP | IT subnets | This Firewall (self) | 443 | Allow IT clients to manage pfSense-Internal over HTTPS |
 | 7 | Allow | TCP | IT subnets | Guest Network Firewall | 443 | Allow IT clients to manage pfSense-Guest over HTTPS |
+| 7 | Allow | TCP | IT subnets | Fortigate Firewall | 443 | Allow IT clients to manage Fortigate over HTTPS |
 | 8 | Block | IPv4 any | IT subnets | `PRIVATE_NETWORKS` | Any | Block other private/internal networks not explicitly allowed above |
 | 9 | Allow | IPv4 any | IT subnets | Any | Any | Allow Internet/non-private destinations |
 
