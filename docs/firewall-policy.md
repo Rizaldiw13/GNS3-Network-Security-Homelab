@@ -132,7 +132,6 @@ The following rule separately permits IT clients from `10.10.10.0/24` to initiat
 
 | Order | Action | Protocol | Source | Destination | Port | Purpose |
 |---:|---|---|---|---|---|---|
-| Auto | Allow | TCP | LAN clients | LAN Address | 443/80 | pfSense anti-lockout rule |
 | 1 | Allow | TCP/UDP | LAN subnets | `10.10.30.10` | 53 | Allow DNS to DNS01 |
 | 2 | Allow | ICMP echo request | LAN subnets | This Firewall (self) | Any | Allow gateway reachability testing |
 | 3 | Block | IPv4 any | LAN subnets | `PRIVATE_NETWORKS` | Any | Block Guest access to internal/private networks |
@@ -142,7 +141,7 @@ The DNS exception must be above the private-network block because DNS01 (`10.10.
 
 ### Guest Management Hardening
 
-Trusted remote management from the HQ IT network is now explicitly configured on the pfSense-Guest WAN interface:
+Trusted remote management from the HQ IT network is explicitly configured on the pfSense-Guest WAN interface:
 
 ```text
 Source:      10.10.10.0/24
@@ -152,9 +151,18 @@ Port:        443
 Action:      Allow
 ```
 
-This gives HQ IT a dedicated management path to the pfSense-Guest GUI without requiring broad access from the Guest LAN.
+The matching pfSense-Internal IT-interface rule permits `10.10.10.0/24` to reach `10.10.253.2` on TCP/443.
 
-The default pfSense anti-lockout rule on the Guest LAN should only be disabled after the HQ IT management path has been tested successfully. Until that anti-lockout rule is removed, Guest-LAN clients may still be able to reach the firewall web interface on ports 80/443.
+This path has been tested successfully from the HQ IT network.
+
+The default webConfigurator anti-lockout rule on pfSense-Guest has now been disabled. Guest-LAN clients therefore no longer receive automatic GUI access on ports 80/443; management access is controlled by explicit firewall rules instead.
+
+The intended management model is now:
+
+```text
+HQ IT -> pfSense-Guest HTTPS/443 -> Allow
+Guest clients -> pfSense-Guest GUI -> Deny
+```
 
 ---
 
@@ -165,7 +173,7 @@ The default pfSense anti-lockout rule on the Guest LAN should only be disabled a
 | IT | Local | Allow | Allow | Allow | DNS allowed | Allow | HTTPS allowed | HTTPS allowed |
 | Finance | Block | Local | Block | Block | DNS allowed | Allow | Block | Block |
 | HR | Block | Block | Local | Block | DNS allowed | Allow | Block | Block |
-| Guest | Block | Block | Block | Local | DNS allowed | Allow | Not intended | Anti-lockout remains until removed |
+| Guest | Block | Block | Block | Local | DNS allowed | Allow | Not intended | Blocked |
 | Core/other networks | Default deny at pfSense-Internal WAN | Default deny | Default deny | Depends on Guest WAN rules | N/A | N/A | Default deny | Default deny except explicit WAN rules |
 
 ---
@@ -227,4 +235,5 @@ The current firewall configuration has been tested successfully for:
 - DHCP operation through pfSense relay.
 - IT HTTPS management of pfSense-Internal at `10.10.10.1`.
 - HQ IT HTTPS management of pfSense-Guest at `10.10.253.2`, through explicit TCP/443 rules on both pfSense-Internal and pfSense-Guest.
+- Guest-LAN automatic webConfigurator access removed by disabling the pfSense anti-lockout rule.
 
