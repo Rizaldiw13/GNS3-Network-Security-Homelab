@@ -24,6 +24,8 @@ Authentication secrets are redacted before committing.
 
 The FortiGate snapshot intentionally includes only configuration relevant to this lab. Default/inactive interfaces, unique identifiers, and unrelated system settings are omitted.
 
+The `INTERNAL-NETWORKS` address object represents `10.10.0.0/16`.
+
 The active perimeter policy currently permits the `INTERNAL-NETWORKS` source object to use:
 
 - HTTPS
