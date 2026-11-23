@@ -396,7 +396,7 @@ The topology now demonstrates:
 - Controlled inter-VLAN access
 - Guest isolation
 - IT administrative access to protected networks
-- IT-only pfSense GUI management
+- IT-controlled pfSense GUI management, including remote management of pfSense-Guest
 - End-to-end Internet connectivity
 
 The firewall-segmentation milestone is complete.
