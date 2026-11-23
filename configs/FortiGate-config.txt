@@ -38,9 +38,14 @@ config router static
     next
 end
 
+# Internal network address object referenced by the perimeter policy.
+config firewall address
+    edit "INTERNAL-NETWORKS"
+        set subnet 10.10.0.0 255.255.0.0
+    next
+end
+
 # Internal-to-Internet policy.
-# The source address object INTERNAL-NETWORKS is referenced by the running policy.
-# Its object definition is not included in this snapshot.
 config firewall policy
     edit 1
         set name "Internal-to-Internet"
