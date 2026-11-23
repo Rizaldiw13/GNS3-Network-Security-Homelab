@@ -357,6 +357,9 @@ The lab has included hands-on troubleshooting of:
 - Webterm persistent IP/network configuration
 - Temporary pfSense GUI lockout during management-network migration
 - Recovery using the pfSense console and `pfctl`
+- Multi-firewall management-path troubleshooting
+- FortiGate HTTPS management from the IT VLAN
+- FortiGate filesystem-check reboot and interface verification
 
 See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the detailed troubleshooting record.
 
@@ -398,7 +401,7 @@ GNS3-Network-Security-Homelab/
 ├── packet-captures/
 ├── topology/
 │   ├── README.md
-│   ├── Current-GNS3-Topology.jpg
+│   ├── Current-Topology.png
 │   └── historical topology images
 └── README.md
 ```
