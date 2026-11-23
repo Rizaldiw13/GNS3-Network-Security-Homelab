@@ -245,7 +245,7 @@ HTTPS management from the IT network has been verified at:
 https://10.10.254.1
 ```
 
-pfSense-Internal contains a corresponding IT-interface rule allowing TCP/443 to `10.10.254.1` above the broader private-network block. Although FortiGate `port2` also permits SSH at the interface level, SSH management from `webterm-IT` has not yet been recorded as a verified test in this milestone.
+pfSense-Internal contains a corresponding IT-interface rule allowing TCP/443 to `10.10.254.1` above the broader private-network block. Although FortiGate `port2` also permits SSH at the interface level.
 
 ---
 

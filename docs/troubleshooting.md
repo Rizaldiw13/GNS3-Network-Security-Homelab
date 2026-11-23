@@ -1373,8 +1373,6 @@ Check:
 5. destination-interface management permissions
 6. destination service state
 
-This layered approach reduced guesswork and made multi-firewall troubleshooting much faster.
-
 ---
 
 # Troubleshooting Methodology Used

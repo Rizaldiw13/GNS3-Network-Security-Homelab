@@ -359,7 +359,7 @@ The lab has included hands-on troubleshooting of:
 - Recovery using the pfSense console and `pfctl`
 - Multi-firewall management-path troubleshooting
 - FortiGate HTTPS management from the IT VLAN
-- FortiGate filesystem-check reboot and interface verification
+
 
 See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the detailed troubleshooting record.
 

@@ -542,7 +542,7 @@ Current-state documents are updated, while dated project logs remain historical 
 
 ---
 
-## 17. Restricting Perimeter Egress by Service
+## 17. Restricting Perimeter Traffic by Service
 
 ### Decision
 
@@ -599,7 +599,7 @@ IT -> FortiGate         10.10.254.1:443
 
 ### Why
 
-This models the operational role of an IT/network team more realistically:
+This models the operational role of an IT/network team within an organization:
 
 - administrators work from a trusted user/admin network
 - firewall GUIs are not broadly exposed to untrusted departments
