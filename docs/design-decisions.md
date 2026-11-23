@@ -542,7 +542,79 @@ Current-state documents are updated, while dated project logs remain historical 
 
 ---
 
-## 17. Planned Multi-Site Expansion
+## 17. Restricting Perimeter Egress by Service
+
+### Decision
+
+FortiGate does not use a broad unrestricted internal-to-Internet allow rule.
+
+The active `Internal-to-Internet` policy permits:
+
+```text
+HTTPS
+DNS
+NTP
+PING
+```
+
+from the `INTERNAL-NETWORKS` object (`10.10.0.0/16`) toward the Internet-facing interface.
+
+Traffic that does not match an explicit allow policy falls through to FortiGate's implicit deny behavior.
+
+### Why
+
+This creates a more deliberate perimeter-security model than simply allowing all outbound traffic.
+
+It allows the lab to practice:
+
+- service-based egress control
+- default-deny policy behavior
+- firewall rule matching
+- NAT at the perimeter
+- troubleshooting applications that fail because their required service is not allowed
+
+### Trade-off
+
+Some applications may fail even when basic Internet connectivity works because they use ports or protocols that are not currently permitted.
+
+That behavior is intentional and should be evaluated before adding new services.
+
+---
+
+## 18. Centralizing Firewall Administration in the IT VLAN
+
+### Decision
+
+The IT VLAN is the trusted administrative network for browser-based firewall management.
+
+Verified HTTPS management paths are:
+
+```text
+IT -> pfSense-Internal  10.10.10.1:443
+IT -> pfSense-Guest     10.10.253.2:443
+IT -> FortiGate         10.10.254.1:443
+```
+
+`webterm-IT` represents a normal DHCP-based IT administrative workstation rather than a dedicated out-of-band management host.
+
+### Why
+
+This models the operational role of an IT/network team more realistically:
+
+- administrators work from a trusted user/admin network
+- firewall GUIs are not broadly exposed to untrusted departments
+- remote firewall management requires explicit policy exceptions
+- the same workstation can troubleshoot protected endpoints and infrastructure
+
+### Security Impact
+
+Management access is intentionally restricted to the trusted IT source network and the required management destination/port.
+
+For pfSense-Guest and FortiGate, the management path crosses routed/security boundaries, so the necessary upstream firewall rules must be present before the destination device can be reached.
+
+---
+
+## 19. Planned Multi-Site Expansion
 
 ### Status
 
