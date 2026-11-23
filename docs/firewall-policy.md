@@ -41,7 +41,7 @@ Rules are evaluated top-down.
 | 4 | Allow | IPv4 any | IT subnets | HR subnets | Any | Allow IT to manage/reach HR |
 | 5 | Allow | IPv4 any | IT subnets | `10.10.20.0/24` | Any | Allow IT to reach Guest for support |
 | 6 | Allow | TCP | IT subnets | This Firewall (self) | 443 | Allow IT clients to manage pfSense-Internal over HTTPS |
-| 7 | Allow | TCP | IT subnets | `10.10.253.2` | 443 | Allow IT to reach the pfSense-Guest management interface |
+| 7 | Allow | TCP | IT subnets | Guest Network Firewall | 443 | Allow IT clients to manage pfSense-Guest over HTTPS |
 | 8 | Block | IPv4 any | IT subnets | `PRIVATE_NETWORKS` | Any | Block other private/internal networks not explicitly allowed above |
 | 9 | Allow | IPv4 any | IT subnets | Any | Any | Allow Internet/non-private destinations |
 
@@ -78,7 +78,6 @@ Because the private-network block occurs before the final outbound allow, HR can
 
 ![Firewall HQ WAN rules](/docs/firewall-rules/Firewall-HQ-WAN.png)
 
-
 I intentionally did not configure explicit pass rules on the pfSense-Internal WAN interface.
 
 The WAN interface is the transit link toward R1, not the public Internet. Traffic initiated from IT, Finance, or HR is evaluated when it enters pfSense on the corresponding internal interface. When an allow rule creates a firewall state, related return traffic arriving through WAN is automatically permitted.
@@ -112,6 +111,8 @@ Core / remote network initiated traffic
 
 ### Guest WAN Policy
 
+![Firewall Guest WAN rules](/docs/firewall-rules/Firewall-Guest-WAN.png)
+
 | Order | Action | Protocol | Source | Destination | Purpose |
 |---:|---|---|---|---|---|
 | 1 | Block | Any | Reserved/bogon sources | Any | Block invalid/unallocated source networks |
@@ -119,16 +120,13 @@ Core / remote network initiated traffic
 | 3 | Allow | IPv4 any | `10.10.10.0/24` | LAN subnets | Any | Allow HQ/IT access to Guest hosts for support |
 | 4 | Allow | ICMP echo request | `10.10.253.1` | `10.10.253.2` | Any | Allow R3 to ping the pfSense-Guest WAN interface |
 
-The complete HQ IT management path requires matching permission on both firewalls:
-
-- **pfSense-Internal IT interface:** allow `10.10.10.0/24` to `10.10.253.2` on TCP/443.
-- **pfSense-Guest WAN interface:** allow `10.10.10.0/24` to the WAN address `10.10.253.2` on TCP/443.
-
-This path has been tested successfully from the IT network using `https://10.10.253.2`.
+The HTTPS management rule allows trusted IT clients from `10.10.10.0/24` to reach the pfSense-Guest web interface at `https://10.10.253.2`.
 
 The following rule separately permits IT clients from `10.10.10.0/24` to initiate connections toward Guest hosts for support and troubleshooting.
 
 ### Guest LAN Policy
+
+![Firewall Guest LAN rules](/docs/firewall-rules/Firewall-Guest-LAN.png)
 
 | Order | Action | Protocol | Source | Destination | Port | Purpose |
 |---:|---|---|---|---|---|---|
@@ -141,7 +139,7 @@ The DNS exception must be above the private-network block because DNS01 (`10.10.
 
 ### Guest Management Hardening
 
-Trusted remote management from the HQ IT network is explicitly configured on the pfSense-Guest WAN interface:
+Trusted remote management from the HQ IT network is now explicitly configured on the pfSense-Guest WAN interface:
 
 ```text
 Source:      10.10.10.0/24
@@ -151,18 +149,9 @@ Port:        443
 Action:      Allow
 ```
 
-The matching pfSense-Internal IT-interface rule permits `10.10.10.0/24` to reach `10.10.253.2` on TCP/443.
+This gives HQ IT a dedicated management path to the pfSense-Guest GUI without requiring broad access from the Guest LAN.
 
-This path has been tested successfully from the HQ IT network.
-
-The default webConfigurator anti-lockout rule on pfSense-Guest has now been disabled. Guest-LAN clients therefore no longer receive automatic GUI access on ports 80/443; management access is controlled by explicit firewall rules instead.
-
-The intended management model is now:
-
-```text
-HQ IT -> pfSense-Guest HTTPS/443 -> Allow
-Guest clients -> pfSense-Guest GUI -> Deny
-```
+The default pfSense anti-lockout rule on the Guest LAN should only be disabled after the HQ IT management path has been tested successfully. Until that anti-lockout rule is removed, Guest-LAN clients may still be able to reach the firewall web interface on ports 80/443.
 
 ---
 
@@ -173,7 +162,7 @@ Guest clients -> pfSense-Guest GUI -> Deny
 | IT | Local | Allow | Allow | Allow | DNS allowed | Allow | HTTPS allowed | HTTPS allowed |
 | Finance | Block | Local | Block | Block | DNS allowed | Allow | Block | Block |
 | HR | Block | Block | Local | Block | DNS allowed | Allow | Block | Block |
-| Guest | Block | Block | Block | Local | DNS allowed | Allow | Not intended | Blocked |
+| Guest | Block | Block | Block | Local | DNS allowed | Allow | Not intended | Anti-lockout remains until removed |
 | Core/other networks | Default deny at pfSense-Internal WAN | Default deny | Default deny | Depends on Guest WAN rules | N/A | N/A | Default deny | Default deny except explicit WAN rules |
 
 ---
@@ -234,6 +223,5 @@ The current firewall configuration has been tested successfully for:
 - DNS access from all client networks to `10.10.30.10`.
 - DHCP operation through pfSense relay.
 - IT HTTPS management of pfSense-Internal at `10.10.10.1`.
-- HQ IT HTTPS management of pfSense-Guest at `10.10.253.2`, through explicit TCP/443 rules on both pfSense-Internal and pfSense-Guest.
-- Guest-LAN automatic webConfigurator access removed by disabling the pfSense anti-lockout rule.
+- HQ IT HTTPS management of pfSense-Guest at `10.10.253.2`.
 
