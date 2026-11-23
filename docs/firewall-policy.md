@@ -42,9 +42,10 @@ Rules are evaluated top-down.
 | 5 | Allow | IPv4 any | IT subnets | `10.10.20.0/24` | Any | Allow IT to reach Guest for support |
 | 6 | Allow | TCP | IT subnets | This Firewall (self) | 443 | Allow IT clients to manage pfSense-Internal over HTTPS |
 | 7 | Allow | TCP | IT subnets | Guest Network Firewall | 443 | Allow IT clients to manage pfSense-Guest over HTTPS |
-| 8 | Allow | TCP | IT subnets | FortiGate Firewall (`10.10.254.1`) | 443 | Allow IT clients to manage FortiGate over HTTPS |
-| 9 | Block | IPv4 any | IT subnets | `PRIVATE_NETWORKS` | Any | Block other private/internal networks not explicitly allowed above |
-| 10 | Allow | IPv4 any | IT subnets | Any | Any | Allow Internet/non-private destinations |
+| 8 | Allow | TCP | IT subnets | FortiGate Firewall (`10.10.254.1`) | 22 | Allow IT clients to manage FortiGate over SSH |
+| 9 | Allow | TCP | IT subnets | FortiGate Firewall (`10.10.254.1`) | 443 | Allow IT clients to manage FortiGate over HTTPS |
+| 10 | Block | IPv4 any | IT subnets | `PRIVATE_NETWORKS` | Any | Block other private/internal networks not explicitly allowed above |
+| 11 | Allow | IPv4 any | IT subnets | Any | Any | Allow Internet/non-private destinations |
 
 ### Finance Interface Policy
 
@@ -169,6 +170,8 @@ FortiGate provides the perimeter security boundary between R2 and the GNS3 NAT/I
 
 ### Interfaces
 
+![Fortigate-Interfaces](/docs/firewall-rules/Firewall-Fortigate-Interfaces.png)
+
 | Interface | Address / Assignment | Role |
 |---|---|---|
 | `port1` | DHCP from GNS3 NAT | Internet-facing/WAN interface |
@@ -200,6 +203,8 @@ This route tells FortiGate to send return traffic for internal `10.10.0.0/16` de
 ### Internal-to-Internet Policy
 
 The active FortiGate firewall policy is:
+
+![Fortigate-Interfaces](/docs/firewall-rules/Firewall-Fortigate.png)
 
 | Action | Source interface | Destination interface | Source | Destination | Allowed services | NAT | Logging |
 |---|---|---|---|---|---|---|---|
