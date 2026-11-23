@@ -5,17 +5,14 @@
         "ens3"
       ]
     },
-
     "lease-database": {
       "type": "memfile",
       "persist": true,
       "name": "/var/lib/kea/kea-leases4.csv"
     },
-
     "valid-lifetime": 86400,
     "renew-timer": 43200,
     "rebind-timer": 75600,
-
     "subnet4": [
       {
         "id": 1,
@@ -36,7 +33,6 @@
           }
         ]
       },
-
       {
         "id": 2,
         "subnet": "10.10.20.0/24",
@@ -56,7 +52,6 @@
           }
         ]
       },
-
       {
         "id": 3,
         "subnet": "10.10.40.0/24",
@@ -76,7 +71,6 @@
           }
         ]
       },
-
       {
         "id": 4,
         "subnet": "10.10.50.0/24",
@@ -89,46 +83,6 @@
           {
             "name": "routers",
             "data": "10.10.50.1"
-          },
-          {
-            "name": "domain-name-servers",
-            "data": "10.10.30.10"
-          }
-        ]
-      },
-
-      {
-        "id": 5,
-        "subnet": "10.10.60.0/24",
-        "pools": [
-          {
-            "pool": "10.10.60.100 - 10.10.60.199"
-          }
-        ],
-        "option-data": [
-          {
-            "name": "routers",
-            "data": "10.10.60.1"
-          },
-          {
-            "name": "domain-name-servers",
-            "data": "10.10.30.10"
-          }
-        ]
-      },
-
-      {
-        "id": 6,
-        "subnet": "10.10.70.0/24",
-        "pools": [
-          {
-            "pool": "10.10.70.100 - 10.10.70.199"
-          }
-        ],
-        "option-data": [
-          {
-            "name": "routers",
-            "data": "10.10.70.1"
           },
           {
             "name": "domain-name-servers",
