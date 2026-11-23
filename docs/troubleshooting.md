@@ -966,7 +966,7 @@ IPv6 lookup warnings are not necessarily evidence of an IPv4 DNS failure when th
 
 ---
 
-## 22. DNS Forwarding Validation
+## 15. DNS Forwarding Validation
 
 ### Test
 The DNS server was queried directly:
@@ -994,7 +994,7 @@ This confirmed:
 
 ---
 
-## 15. Internal DNS Zone Validation
+## 16. Internal DNS Zone Validation
 
 ### Configuration
 An internal authoritative zone was created:
@@ -1042,6 +1042,341 @@ The centralized DNS server now provides both:
 
 ---
 
+## 17. pfSense DHCP Relay Failed Until Downstream Interfaces Were Selected
+
+### Problem
+
+After moving client gateway ownership from R1/R3 to the pfSense firewalls, DHCP relay was also moved from the routers to pfSense.
+
+Clients initially failed to receive leases even though the centralized Kea server at `10.10.30.10` was reachable.
+
+### Investigation
+
+The relay service had the correct upstream DHCP server configured, but the required downstream/client-facing interfaces were not selected.
+
+For pfSense-Internal, relay traffic needed to listen on:
+
+```text
+IT
+FINANCE
+HR
+```
+
+For pfSense-Guest, relay traffic needed to listen on:
+
+```text
+LAN / Guest
+```
+
+### Resolution
+
+The appropriate downstream interfaces were selected in the pfSense DHCP relay configuration and the relay service was applied.
+
+### Result
+
+Clients again received addresses from the centralized Kea scopes while pfSense remained the default gateway for each protected subnet.
+
+### Lesson Learned
+
+A DHCP relay needs both:
+
+- the upstream DHCP server address
+- the correct downstream interfaces on which client broadcasts are received
+
+A reachable DHCP server alone is not enough.
+
+---
+
+## 18. Migrating Client Gateways From Routers to pfSense
+
+### Problem
+
+The earlier design used R1 and R3 as client/VLAN gateways. After introducing pfSense, keeping those router gateway interfaces would have created overlapping Layer 3 ownership and bypassed the intended firewall enforcement points.
+
+### Resolution
+
+Gateway ownership was moved to the firewalls:
+
+```text
+IT       10.10.10.1 -> pfSense-Internal
+Finance  10.10.40.1 -> pfSense-Internal
+HR       10.10.50.1 -> pfSense-Internal
+Guest    10.10.20.1 -> pfSense-Guest
+```
+
+R1 and R3 were changed to use firewall transit links instead.
+
+R1 reaches the employee networks through:
+
+```text
+10.10.252.2
+```
+
+R3 reaches the Guest network through:
+
+```text
+10.10.253.2
+```
+
+The protected-network static routes are selectively redistributed into OSPF.
+
+### Result
+
+The routed core continues to learn the protected networks while policy enforcement now occurs at pfSense.
+
+### Lesson Learned
+
+When inserting a firewall as a routed gateway, routing, DHCP relay, OSPF advertisement, and client default-gateway ownership all need to be migrated together.
+
+---
+
+## 19. Temporary pfSense GUI Lockout During Management-Network Migration
+
+### Problem
+
+The old pfSense-Internal management path used the `192.168.1.0/24` LAN network.
+
+After moving management into the IT VLAN and removing the old LAN interface, GUI access was temporarily lost during the transition.
+
+### Recovery
+
+The pfSense console was used to regain administrative control.
+
+Packet filtering was temporarily disabled:
+
+```text
+pfctl -d
+```
+
+After the required IT management rule was created and applied, packet filtering was re-enabled:
+
+```text
+pfctl -e
+```
+
+The final management address became:
+
+```text
+https://10.10.10.1
+```
+
+with access permitted from the IT subnet.
+
+### Result
+
+The obsolete `192.168.1.0/24` management network was removed and firewall management now occurs from the trusted IT VLAN.
+
+### Lesson Learned
+
+When changing the interface used to administer a firewall, create and verify the replacement management path before removing the old one.
+
+Console access is an essential recovery path when firewall policy changes lock out the GUI.
+
+---
+
+## 20. IT Could Reach Guest Hosts but Not the pfSense-Guest GUI
+
+### Problem
+
+IT clients could reach the Guest network, but browsing to the pfSense-Guest WAN/transit address:
+
+```text
+https://10.10.253.2
+```
+
+timed out.
+
+### Investigation
+
+The management session crossed two firewall enforcement points:
+
+```text
+IT
+ |
+pfSense-Internal
+ |
+R1 -> R3
+ |
+pfSense-Guest
+```
+
+pfSense-Guest already had a WAN rule allowing HQ IT to reach its WAN address on TCP/443.
+
+However, pfSense-Internal still treated `10.10.253.2` as a private destination and the traffic reached the broader `PRIVATE_NETWORKS` block.
+
+### Resolution
+
+An explicit IT-interface rule was added on pfSense-Internal above the private-network block:
+
+```text
+Source:      IT subnet
+Destination: 10.10.253.2
+Protocol:    TCP
+Port:        443
+Action:      Allow
+```
+
+### Result
+
+The pfSense-Guest GUI became reachable from the IT network.
+
+The Guest-side automatic webConfigurator anti-lockout rule was then disabled so Guest clients no longer had broad GUI access.
+
+### Lesson Learned
+
+When a management session crosses multiple firewalls, every enforcement point along the path must permit the traffic.
+
+---
+
+## 21. IT Could Not Reach the FortiGate GUI Because of the Private-Network Block
+
+### Problem
+
+FortiGate `port2` was configured to allow HTTPS management, but the IT workstation could not initially use the intended remote management path to:
+
+```text
+https://10.10.254.1
+```
+
+### Root Cause
+
+The destination `10.10.254.1` is private RFC1918 space.
+
+On pfSense-Internal, IT traffic that was not covered by a more specific exception reached the broader rule:
+
+```text
+IT -> PRIVATE_NETWORKS -> Block
+```
+
+### Resolution
+
+A specific rule was added above the private-network block:
+
+```text
+Source:      IT subnet
+Destination: 10.10.254.1
+Protocol:    TCP
+Port:        443
+Action:      Allow
+```
+
+FortiGate `port2` already had HTTPS enabled under its interface management settings.
+
+### Result
+
+`webterm-IT` successfully opened the FortiGate GUI through the routed core.
+
+### Lesson Learned
+
+Device-management traffic to a firewall itself is different from transit firewall policy.
+
+The upstream path must permit the management connection, and the destination firewall interface must also allow the relevant administrative service.
+
+---
+
+## 22. FortiGate Filesystem Warning After an Unclean Shutdown
+
+### Problem
+
+After logging into the FortiGate GUI, FortiGate reported that the previous reboot had been triggered by a power disruption and recommended checking filesystem consistency.
+
+### Action
+
+The recommended reboot and filesystem check was started from the FortiGate GUI.
+
+During the reboot:
+
+- `10.10.254.1` temporarily stopped responding.
+- Internet access through the FortiGate was expected to be unavailable.
+- The GUI eventually reported that the reboot was taking longer than expected.
+
+### Investigation
+
+The serial console was checked instead of repeatedly rebooting the appliance.
+
+The normal FortiGate login prompt appeared, confirming that FortiOS had booted.
+
+The following commands were then used:
+
+```text
+get system status
+get system interface physical
+diagnose netlink interface list port2
+```
+
+The interface state showed:
+
+```text
+port1: up, DHCP address from GNS3 NAT
+port2: up, 10.10.254.1/30
+```
+
+### Result
+
+The GUI became reachable again at:
+
+```text
+https://10.10.254.1
+```
+
+The firewall and its management interface were operating normally after the check.
+
+### Lesson Learned
+
+A slow management GUI during a reboot does not automatically mean the firewall failed to boot.
+
+Check the serial console and interface state before power-cycling again, especially while a filesystem check may be running.
+
+---
+
+## 23. Following the Full Packet Path Instead of Troubleshooting Only the Destination
+
+### Observation
+
+Several firewall issues initially looked like destination-device failures even though the actual block occurred earlier in the path.
+
+Examples included:
+
+- IT -> pfSense-Guest management
+- IT -> FortiGate management
+- protected-network access through pfSense
+- DHCP relay through a routed/firewalled topology
+
+### Method
+
+For cross-network failures, the path was traced one enforcement point at a time:
+
+```text
+Source host
+  |
+Local gateway / source firewall
+  |
+Routing table
+  |
+Core routers
+  |
+Destination-side firewall/interface policy
+  |
+Destination service
+```
+
+### Lesson Learned
+
+Do not assume that a timeout means the destination device is rejecting the connection.
+
+Check:
+
+1. source addressing and gateway
+2. source-interface firewall policy
+3. routing
+4. every intermediate security boundary
+5. destination-interface management permissions
+6. destination service state
+
+This layered approach reduced guesswork and made multi-firewall troubleshooting much faster.
+
+---
+
 # Troubleshooting Methodology Used
 
 Across these incidents, the most useful troubleshooting sequence was:
@@ -1081,6 +1416,10 @@ Across these incidents, the most useful troubleshooting sequence was:
    sudo -u _kea /usr/sbin/kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
    ```
 
-8. Change one component at a time and retest.
+8. For traffic crossing firewalls, trace every enforcement point along the path.
 
-This approach made it easier to separate Layer 2, Layer 3, routing, DHCP, NAT, DNS, and service-level problems instead of treating every connectivity failure as the same issue.
+9. Confirm destination-device management services separately from transit policy.
+
+10. Change one component at a time and retest.
+
+This approach made it easier to separate Layer 2, Layer 3, routing, DHCP, NAT, DNS, firewall policy, and service-level problems instead of treating every connectivity failure as the same issue.
