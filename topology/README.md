@@ -60,7 +60,7 @@ DHCP01/DNS01 is connected directly to R2 on the `10.10.30.0/24` server network.
 | Switch3 | Secondary internal access switch connected to Switch1 by 802.1Q trunk |
 | Switch2 | Guest access switch |
 | webterm-IT | DHCP-based IT workstation with HTTPS management access to pfSense-Internal |
-| webterm-1 | Guest-side Webterm used for Guest testing and pfSense-Guest access |
+| webterm-1 | Guest-side browser-enabled workstation used for Guest-network testing |
 
 ---
 
